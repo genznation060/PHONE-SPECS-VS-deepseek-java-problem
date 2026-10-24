@@ -1,0 +1,2883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Phone Spec Comparison Video Maker v4 — WebCodecs MP4</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.1/build/mp4-muxer.js"></script>
+<style>
+:root {
+    --bg-deep: #070b0f;
+    --bg-panel: #0c1218;
+    --bg-card: #111820;
+    --bg-input: #0a1016;
+    --border: #1e2a36;
+    --border-soft: #1a2530;
+    --accent: #3dd68c;
+    --accent-dim: #2a9d6a;
+    --accent-glow: rgba(61, 214, 140, 0.18);
+    --text: #e8eef4;
+    --text-muted: #8b9aab;
+    --text-dim: #5c6b7a;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 8px 32px rgba(0,0,0,0.55);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#out {
+    aspect-ratio: 16/9;
+    width: min(100vw, 177.78vh);
+    height: auto;
+    display: block;
+    background: #000;
+}
+
+#ui {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 96%;
+    max-width: 640px;
+    max-height: 96vh;
+    background: var(--bg-panel);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow), 0 0 0 1px rgba(61,214,140,0.08);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#ui-header {
+    padding: 14px 18px 10px;
+    text-align: center;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+}
+#ui-header h3 {
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    color: var(--accent);
+    text-transform: uppercase;
+}
+
+#webcodecs-warning {
+    display: none;
+    font-size: 0.76rem;
+    color: #ffab91;
+    background: rgba(198,40,40,0.18);
+    border-bottom: 1px solid rgba(255,138,101,0.3);
+    padding: 8px 14px;
+    line-height: 1.4;
+}
+
+.preview-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--bg-panel);
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid var(--border-soft);
+    flex-shrink: 0;
+}
+#previewCanvas {
+    width: 100%;
+    aspect-ratio: 16/9;
+    display: block;
+    border-radius: var(--radius-sm);
+    background: #000;
+    border: 1px solid var(--border);
+}
+.preview-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 7px;
+}
+.preview-controls button {
+    width: auto;
+    margin: 0;
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+    color: #04170c;
+    font-weight: 800;
+    border: none;
+    cursor: pointer;
+}
+.preview-controls input[type=range] {
+    flex: 1;
+    margin: 0;
+    height: 22px;
+    background: transparent;
+    border: none;
+}
+.preview-controls span {
+    font-size: 0.68rem;
+    color: var(--accent);
+    font-weight: 700;
+    min-width: 42px;
+    text-align: right;
+}
+.safe-guide-row {
+    margin-top: 6px;
+}
+
+#ui-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 14px 16px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.accordion {
+    margin-top: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    background: var(--bg-card);
+    overflow: hidden;
+}
+.accordion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    cursor: pointer;
+    user-select: none;
+    background: rgba(255,255,255,0.02);
+    transition: background 0.15s;
+}
+.accordion-header:hover {
+    background: rgba(61,214,140,0.06);
+}
+.accordion-header h4 {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.accordion-header .chevron {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.25s ease;
+    color: var(--text-muted);
+}
+.accordion.open .chevron {
+    transform: rotate(180deg);
+}
+.accordion-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.32s ease;
+}
+.accordion.open .accordion-body {
+    max-height: 1200px;
+}
+.accordion-inner {
+    padding: 4px 14px 14px;
+}
+
+label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    display: block;
+    font-weight: 600;
+}
+.row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    margin-bottom: 2px;
+}
+.row > div {
+    flex: 1;
+    min-width: 0;
+}
+input, select, button {
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-family: inherit;
+}
+input[type=color] {
+    padding: 3px;
+    height: 34px;
+    cursor: pointer;
+}
+input[type=range] {
+    padding: 0;
+    height: 24px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+input[type=file] {
+    font-size: 0.7rem;
+    padding: 6px;
+}
+button {
+    background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+    font-weight: 800;
+    border: none;
+    font-size: 0.92rem;
+    cursor: pointer;
+    margin-top: 6px;
+    padding: 12px;
+    color: #04170c;
+    transition: filter 0.15s, transform 0.1s;
+}
+button:hover { filter: brightness(1.1); }
+button:active { transform: scale(0.985); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+    background: #1a2530;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    font-size: 0.74rem;
+    padding: 7px 10px;
+    margin-top: 0;
+    font-weight: 700;
+}
+.btn-secondary:hover { background: #243040; color: var(--text); }
+
+.chk {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 7px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.chk input { width: auto; margin: 0; }
+
+.info {
+    font-size: 0.72rem;
+    color: var(--accent);
+    background: var(--accent-glow);
+    border: 1px solid rgba(61,214,140,0.25);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    line-height: 1.45;
+    display: none;
+}
+
+.hint {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    margin: 4px 0 6px;
+    line-height: 1.4;
+}
+
+.spec-list {
+    max-height: 180px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    margin-bottom: 8px;
+}
+.spec-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 0.7rem;
+}
+.spec-row:last-child { border-bottom: none; }
+.spec-row input[type=checkbox] { width: auto; margin: 0; }
+.spec-name {
+    flex: 0 0 110px;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.spec-vals {
+    flex: 1;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.spec-vals b { color: var(--accent); }
+.spec-row select {
+    width: auto;
+    margin: 0;
+    padding: 3px 5px;
+    font-size: 0.65rem;
+    flex: 0 0 72px;
+}
+
+#statusMsg {
+    text-align: center;
+    font-size: 0.76rem;
+    color: #ffd400;
+    margin-top: 8px;
+    display: block;
+    line-height: 1.35;
+    white-space: pre-wrap;
+}
+
+#topControls {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 30;
+    display: none;
+    gap: 8px;
+}
+.mini-btn {
+    width: auto;
+    margin: 0;
+    padding: 9px 16px;
+    font-size: 0.8rem;
+    border-radius: 22px;
+    font-weight: 800;
+    cursor: pointer;
+    border: none;
+}
+.btn-red { background: linear-gradient(90deg, #c62828, #ef5350); color: #fff; }
+.btn-gold { background: linear-gradient(90deg, #f57f17, #fdd835); color: #000; }
+.btn-grey { background: #25313b; color: #ddd; }
+
+#endModal {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,14,18,0.96);
+    padding: 10px 16px;
+    border-radius: 30px;
+    z-index: 40;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid rgba(61,214,140,0.45);
+    white-space: nowrap;
+}
+#endModal span {
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+#audio-status {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.45;
+    background: rgba(0,0,0,0.22);
+    padding: 6px 8px;
+    border-radius: 6px;
+}
+
+@media (max-width: 600px) {
+    #ui {
+        width: 100%;
+        max-width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        top: 0;
+        left: 0;
+        transform: none;
+    }
+    .row {
+        flex-direction: column;
+        gap: 0;
+    }
+    .row > div { width: 100%; }
+    .accordion-header h4 { font-size: 0.74rem; }
+    input, select { font-size: 0.82rem; padding: 10px; }
+    .preview-wrap { padding: 8px 10px 6px; }
+    #ui-scroll { padding: 0 10px 20px; }
+}
+
+.val-label {
+    font-weight: 700;
+    color: var(--accent);
+}
+#tabs{display:flex;gap:6px;overflow-x:auto;padding:8px 10px;background:rgba(10,12,24,.92);border-bottom:1px solid var(--border-soft);flex-shrink:0;scrollbar-width:none}
+#tabs::-webkit-scrollbar{display:none}
+#tabs button{width:auto;flex:0 0 auto;margin:0;padding:8px 13px;border-radius:20px;background:rgba(255,255,255,.05);color:var(--text-muted);font-size:.74rem;font-weight:700;border:1px solid var(--border)}
+#tabs button.on{background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#050814;border-color:transparent;box-shadow:0 0 14px rgba(0,229,255,.45)}
+.accordion{background:rgba(255,255,255,.045);backdrop-filter:blur(10px);border-color:rgba(255,255,255,.09)}
+.tabbed .accordion{display:none}.tabbed .accordion.show{display:block}
+.tabbed .accordion-body{max-height:none!important}.tabbed .chevron{display:none}.tabbed .accordion-header{cursor:default}
+input[type=range]{accent-color:#00e5ff}
+</style>
+</head>
+<body>
+
+<canvas id="out" width="1920" height="1080"></canvas>
+
+<div id="topControls">
+    <button class="mini-btn btn-red" id="stopBtn">⏹ Cancel</button>
+</div>
+
+<div id="endModal">
+    <span>✅ Video Ready</span>
+    <button class="mini-btn btn-gold" id="saveBtn">📥 Save Video</button>
+    <button class="mini-btn btn-grey" id="newBtn">🛠️ Edit Settings</button>
+</div>
+
+<div id="ui">
+    <div id="ui-header">
+        <h3>📱 Phone Spec Comparison Maker · v4</h3>
+    </div>
+    <div id="webcodecs-warning">
+        ⚠️ This browser doesn't support <b>WebCodecs VideoEncoder</b>. Offline MP4 export will fall back to the legacy MediaRecorder path. For best quality use Chrome / Edge 94+.
+    </div>
+
+    <div class="preview-wrap">
+        <canvas id="previewCanvas" width="960" height="540"></canvas>
+        <div class="preview-controls">
+            <button type="button" id="previewPlayBtn">▶ Play</button>
+            <input type="range" id="previewScrub" min="0" max="100" value="50" step="0.5">
+            <span id="previewTimeLabel">50%</span>
+        </div>
+        <div class="safe-guide-row">
+            <label class="chk" style="margin:0">
+                <input type="checkbox" id="showSafeGuide" checked> Show Central Phone Safe-Zone Guide (Preview Only)
+            </label>
+        </div>
+    </div>
+
+    <div id="tabs"></div>
+    <div id="ui-scroll" class="tabbed">
+
+        <div class="accordion open" data-section="1">
+            <div class="accordion-header">
+                <h4><span>1</span> Data &amp; Phone Names</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <label>Upload CSV / TSV (Spec | Phone A | Phone B | Winner optional)</label>
+                    <input type="file" id="dataFile" accept=".csv,.tsv,.txt">
+                    <div class="hint">Optional 4th column: <b>1</b> = Phone A wins, <b>2</b> = Phone B wins, <b>Tie</b> = no highlight</div>
+                    <div class="info" id="dataInfo"></div>
+                    <label class="chk" style="margin-top:8px"><input type="checkbox" id="autoWin"> Auto-winner for rows with no winner in the CSV (higher number wins; lower for price, weight, etc.)</label>
+                    <div id="colMap" style="display:none;margin-top:10px"></div>
+                    <div class="row">
+                        <div><label>Phone A Name</label><input type="text" id="nameA" value="VIVO S2 5G"></div>
+                        <div><label>Phone B Name</label><input type="text" id="nameB" value="VIVO V80 5G"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion open" data-section="2">
+            <div class="accordion-header">
+                <h4><span>2</span> Text Placement &amp; Animation</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <div class="row">
+                        <div>
+                            <label>Side Specs Animation Style</label>
+                            <select id="specAnimStyle">
+<option value="none">Instant cut (zero CPU)</option><option value="fade">Fade (cheapest)</option><option value="fadeRise">Fade + rise</option>
+<option value="slideLeft">Slide left</option><option value="slideRight">Slide right</option><option value="slideUp">Slide up</option><option value="slideDown">Slide down</option>
+<option value="zoomIn">Zoom in</option><option value="zoomOut">Zoom out</option><option value="wipe">Wipe reveal</option><option value="iris">Iris circle</option>
+<option value="subtle">Subtle zoom + fade</option><option value="random">Random per question</option>
+<option value="slideUpSnapDown" selected>Slide Up In + Snap Down Out</option><option value="slideSideSnapDown">Slide Side In + Snap Down Out</option>
+<option value="popSnapDown">Elastic Pop In + Snap Down Out</option><option value="flipSnapDown">3D Flip In + Snap Down Out</option><option value="zoomFade">Smooth Zoom &amp; Fade</option></select>
+                        </div>
+                        <div>
+                            <label>Top Title Animation</label>
+                            <select id="titleAnimToggle">
+                                <option value="off" selected>OFF (Static at Top)</option>
+                                <option value="fade">Fade In / Out</option>
+                                <option value="drop">Slide Down In / Up Out</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Top Title Y — <span class="val-label" id="titleYVal">72px</span></label>
+                            <input type="range" id="titleY" min="35" max="220" value="72">
+                        </div>
+                        <div>
+                            <label>Top Title Max Size — <span class="val-label" id="titleSizeVal">72px</span></label>
+                            <input type="range" id="titleSize" min="40" max="105" value="72">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Specs Edge X — <span class="val-label" id="specXVal">265px</span></label>
+                            <input type="range" id="specX" min="140" max="420" value="265">
+                        </div>
+                        <div>
+                            <label>Specs Vertical Y — <span class="val-label" id="specYVal">540px</span></label>
+                            <input type="range" id="specY" min="300" max="760" value="540">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Specs Max Font — <span class="val-label" id="specSizeVal">64px</span></label>
+                            <input type="range" id="specSize" min="36" max="90" value="64">
+                        </div>
+                        <div>
+                            <label>Specs Box Max Width — <span class="val-label" id="specWVal">440px</span></label>
+                            <input type="range" id="specW" min="260" max="600" value="440">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Snap-Out Speed — <span class="val-label" id="snapSpeedVal">Fast (14%)</span></label>
+                            <input type="range" id="snapSpeed" min="8" max="28" value="14">
+                        </div>
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion open" data-section="3">
+            <div class="accordion-header">
+                <h4><span>3</span> Specs To Show</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <div class="spec-list" id="specList"></div>
+                    <div class="row">
+                        <div><label class="chk"><input type="checkbox" id="skipSame" checked> Skip identical values</label></div>
+                        <div><label class="chk"><input type="checkbox" id="highlight" checked> Highlight better value</label></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion" data-section="4">
+            <div class="accordion-header">
+                <h4><span>4</span> Colors</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <div class="row">
+                        <div><label>Top Title Text</label><input type="color" id="titleColor" value="#ffd400"></div>
+                        <div><label>Title Outline</label><input type="color" id="titleStrokeColor" value="#000000"></div>
+                        <div><label>Normal Spec Text</label><input type="color" id="specTextColor" value="#ffffff"></div>
+                        <div><label>Phone Names</label><input type="color" id="phoneNameColor" value="#ffffff"></div>
+                    </div>
+                    <div class="row">
+                        <div><label>Winner Spec Text</label><input type="color" id="accentColor" value="#43e97b"></div>
+                        <div><label>Winner Box BG</label><input type="color" id="winBgColor" value="#0d4726"></div>
+                        <div><label>Winner Border</label><input type="color" id="winBorderColor" value="#43e97b"></div>
+                        <div>
+                            <label>Win BG Opacity <span class="val-label" id="winBgAlphaVal">45%</span></label>
+                            <input type="range" id="winBgAlpha" min="0" max="100" value="45">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div><label>Bottom Bar BG</label><input type="color" id="barBgColor" value="#000000"></div>
+                        <div><label>Bottom Top Line</label><input type="color" id="barLineColor" value="#43e97b"></div>
+                        <div><label>Bottom VS Box</label><input type="color" id="vsBoxColor" value="#d9d9d9"></div>
+                        <div><label>Bottom VS Text</label><input type="color" id="vsTextColor" value="#000000"></div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>VS Text Size — <span class="val-label" id="vsSizeVal">58px</span></label>
+                            <input type="range" id="vsSize" min="32" max="80" value="58">
+                        </div>
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion" data-section="5">
+            <div class="accordion-header">
+                <h4><span>5</span> Background</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <div class="row">
+                        <div>
+                            <label>Background Preset</label>
+                            <select id="bgPreset">
+                                <option value="ocean">Ocean Soft</option>
+                                <option value="slate">Slate Grey</option>
+                                <option value="midnight">Midnight Soft</option>
+                                <option value="forest">Forest Soft</option>
+                                <option value="plum">Plum Soft</option>
+                                <option value="sand">Warm Sand</option>
+                                <option value="charcoal">Charcoal</option>
+                                <option value="custom">Custom Gradient / Solid</option>
+                            </select>
+                        </div>
+                        <div><label>Custom colour 1</label><input type="color" id="bgInner" value="#1a3a5c"></div>
+                        <div><label>Custom colour 2</label><input type="color" id="bgOuter" value="#0d1f2d"></div>
+                    </div>
+                    <div class="hint">Presets use lower saturation so text stays readable.</div>
+                    <div class="row">
+                        <div style="flex:2">
+                            <label>Upload Custom Background Image</label>
+                            <input type="file" id="bgImgFile" accept="image/*">
+                        </div>
+                        <div style="flex:1">
+                            <button type="button" class="btn-secondary" id="clearBgImgBtn" style="margin-bottom:8px">✖ Clear BG Image</button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>BG Dim Overlay — <span class="val-label" id="bgDimVal">20%</span></label>
+                            <input type="range" id="bgDim" min="0" max="85" value="20">
+                        </div>
+                        <div>
+                            <label>BG Image Blur — <span class="val-label" id="bgBlurVal">0px</span></label>
+                            <input type="range" id="bgBlur" min="0" max="24" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion" data-section="6">
+            <div class="accordion-header">
+                <h4><span>6</span> Progress Bar, Icons &amp; Counter</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <div class="row">
+                        <div><label class="chk"><input type="checkbox" id="showProgress" checked> Show Progress Bar</label></div>
+                        <div><label class="chk"><input type="checkbox" id="showCounter" checked> Show Spec Counter</label></div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Moving Icon Mode</label>
+                            <select id="progressIconMode">
+                                <option value="streamAndTip" selected>Many Small Icons + Lead Icon</option>
+                                <option value="streamOnly">Many Small Icons Stream</option>
+                                <option value="tipOnly">Single Icon at Progress Tip</option>
+                                <option value="none">Plain Bar (No Icons)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Select Icon</label>
+                            <select id="progressIconChar">
+                                <option value="⚡" selected>⚡ Lightning</option>
+                                <option value="🔥">🔥 Fire</option>
+                                <option value="📱">📱 Phone</option>
+                                <option value="🚀">🚀 Rocket</option>
+                                <option value="⭐">⭐ Star</option>
+                                <option value="🔋">🔋 Battery</option>
+                                <option value="💎">💎 Diamond</option>
+                                <option value="👑">👑 Crown</option>
+                                <option value="🎯">🎯 Target</option>
+                                <option value="✨">✨ Sparkles</option>
+                                <option value="▶">▶ Play</option>
+                                <option value="●">● Orb</option>
+                                <option value="🏆">🏆 Trophy</option>
+                                <option value="💪">💪 Strength</option>
+                                <option value="🌟">🌟 Glow Star</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Progress Bar Position</label>
+                            <select id="progressPos">
+                                <option value="aboveBar" selected>Above Bottom Bar</option>
+                                <option value="top">Top Edge of Video</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Bar Fill Color</label>
+                            <input type="color" id="progColor" value="#43e97b">
+                        </div>
+                        <div>
+                            <label>Icon Size — <span class="val-label" id="iconSizeVal">22px</span></label>
+                            <input type="range" id="iconSize" min="14" max="38" value="22">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div><label>Channel Watermark (Optional)</label><input type="text" id="channelInput" placeholder="@YourChannel"></div>
+                        <div><label>Counter Text Color</label><input type="color" id="counterColor" value="#ffffff"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion" data-section="7">
+            <div class="accordion-header">
+                <h4><span>7</span> Timing, Audio &amp; Export</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <div class="row">
+                        <div><label>Sec per Spec</label><input type="number" id="perSpec" value="2.6" min="0.8" max="12" step="0.1"></div>
+                        <div>
+                            <label>Procedural SFX</label>
+                            <select id="audioToggle">
+                                <option value="chime">Chimes (Default)</option>
+                                <option value="whoosh">Soft Whoosh</option>
+                                <option value="click">Clean Click</option>
+                                <option value="rise">Rising Tone</option>
+                                <option value="off">OFF (Silent)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Background Music</label>
+                            <select id="bgMusicMode">
+                                <option value="none">None (Silent Background)</option>
+                                <option value="upload">Upload Custom BG Music</option>
+                            </select>
+                        </div>
+                        <div></div>
+                    </div>
+                    <div class="row" id="bgMusicUploadRow" style="display:none">
+                        <div style="flex:2">
+                            <label>Upload BG Music (mp3 / wav / ogg) — loops to fill duration</label>
+                            <input type="file" id="bgMusicFile" accept="audio/*">
+                        </div>
+                        <div style="flex:1">
+                            <button type="button" class="btn-secondary" id="clearBgMusicBtn" style="margin-bottom:8px">✖ Clear BG Music</button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div style="flex:2">
+                            <label>Upload Custom SFX (overrides procedural style; plays on each new spec)</label>
+                            <input type="file" id="customSfxFile" accept="audio/*">
+                        </div>
+                        <div style="flex:1">
+                            <button type="button" class="btn-secondary" id="clearSfxBtn" style="margin-bottom:8px">✖ Clear Custom SFX</button>
+                        </div>
+                    </div>
+                    <div id="audio-status">Audio: no BG music · procedural chime SFX</div>
+                    <div class="hint">Custom SFX overrides procedural SFX. BG music is optional; if uploaded it loops for the whole video at 35% volume.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion" data-section="10">
+            <div class="accordion-header">
+                <h4><span>10</span> Export Quality &amp; Settings</h4>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="accordion-body">
+                <div class="accordion-inner">
+                    <div class="row">
+                        <div>
+                            <label>Export Mode</label>
+                            <select id="exportMode">
+                                <option value="webcodecs" selected>WebCodecs · MP4 (offline, frame-perfect)</option>
+                                <option value="download">MediaRecorder (real-time, legacy)</option>
+                                <option value="preview">Preview Only (no file)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div>
+                            <label>Resolution</label>
+                            <select id="xRes">
+                                <option value="1080" selected>1080p FHD (1920×1080)</option>
+                                <option value="720">720p HD (1280×720)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Frame rate</label>
+                            <select id="xFps">
+                                <option value="30" selected>30 fps</option>
+                                <option value="24">24 fps</option>
+                                <option value="60">60 fps (heavier)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Bitrate</label>
+                            <select id="xMbps">
+                                <option value="30">30 Mbps (max)</option>
+                                <option value="20">20 Mbps (very high)</option>
+                                <option value="12" selected>12 Mbps (recommended)</option>
+                                <option value="8">8 Mbps</option>
+                                <option value="5">5 Mbps</option>
+                                <option value="4">4 Mbps (smallest)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="hint">WebCodecs mode renders each frame at a virtual timestamp — encoding may take 1–3× the video duration on a phone, but output is frame-perfect with synced audio. Keep the tab in front while encoding.</div>
+                    <div class="row">
+                        <div><button type="button" id="saveJson">💾 Save settings (JSON)</button></div>
+                        <div><button type="button" class="btn-secondary" id="loadJson">📂 Import settings</button></div>
+                        <div><button type="button" class="btn-secondary" id="resetSettings">🔄 Reset to defaults</button></div>
+                    </div>
+                    <label class="chk"><input type="checkbox" id="embedImg"> Include phone images in the JSON (bigger file)</label>
+                    <input type="file" id="jsonFile" accept=".json" style="display:none">
+                </div>
+            </div>
+        </div>
+
+        <button id="startBtn">▶ Render Video</button>
+        <div id="statusMsg"></div>
+        <div class="hint" style="text-align:center;margin-top:6px">Center space is kept empty for your own Phone PNGs and VS badge in editing software.</div>
+    </div>
+</div>
+
+<script>
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
+const W = 1920, H = 1080;
+const canvas = document.getElementById('out');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+const previewCanvas = document.getElementById('previewCanvas');
+const pCtx = previewCanvas.getContext('2d', { alpha: false });
+
+const TITLE_FONT = '"Arial Black","Segoe UI",Arial,sans-serif';
+const BODY_FONT  = '"Segoe UI",Arial,sans-serif';
+
+const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
+const smootherstep = x => { x=clamp(x,0,1); return x*x*x*(x*(x*6-15)+10); };
+const easeOutCubic = x => 1-Math.pow(1-clamp(x,0,1),3);
+const easeInBack   = x => { x=clamp(x,0,1); const c1=1.70158, c3=c1+1; return c3*x*x*x - c1*x*x; };
+const easeOutBack  = x => { x=clamp(x,0,1); const c1=1.55, c3=c1+1; return 1 + c3*Math.pow(x-1,3) + c1*Math.pow(x-1,2); };
+
+function hexA(hex,a){
+    const clean = (hex || '#ffffff').replace('#','');
+    const n = parseInt(clean,16) || 0;
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function roundRect(c,x,y,w,h,r){
+    if(c.roundRect){ c.beginPath(); c.roundRect(x,y,w,h,r); return; }
+    const rr = Math.min(r,w/2,h/2);
+    c.beginPath();
+    c.moveTo(x+rr,y);
+    c.arcTo(x+w,y,x+w,y+h,rr);
+    c.arcTo(x+w,y+h,x,y+h,rr);
+    c.arcTo(x,y+h,x,y,rr);
+    c.arcTo(x,y,x+w,y,rr);
+    c.closePath();
+}
+function wrapLines(text,maxW){
+    const words = String(text).split(/\s+/);
+    const lines=[]; let cur='';
+    for(const w of words){
+        const test = cur ? cur+' '+w : w;
+        if(ctx.measureText(test).width > maxW && cur){ lines.push(cur); cur = w; }
+        else cur = test;
+    }
+    if(cur) lines.push(cur);
+    return lines;
+}
+function fitTextBlock(text,maxW,maxLines,maxFont,minFont,weight,family){
+    let size = maxFont, lines = [];
+    for(; size>=minFont; size-=2){
+        ctx.font = `${weight} ${size}px ${family}`;
+        lines = wrapLines(text,maxW);
+        if(lines.length<=maxLines) break;
+    }
+    ctx.font = `${weight} ${Math.max(size,minFont)}px ${family}`;
+    return { lines, size: Math.max(size,minFont) };
+}
+function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* =========================================================
+   WEBCodecs CHECK
+   ========================================================= */
+const hasWebCodecs = ('VideoEncoder' in window);
+if (!hasWebCodecs) {
+    document.getElementById('webcodecs-warning').style.display = 'block';
+    document.getElementById('exportMode').value = 'download';
+}
+
+/* =========================================================
+   SETTINGS PERSISTENCE (localStorage)
+   ========================================================= */
+const SETTINGS_KEY = 'phone_compare_v4_settings_v1';
+const SETTINGS_FIELDS = [
+    'nameA','nameB','specAnimStyle','titleAnimToggle','titleY','titleSize',
+    'specX','specY','specSize','specW','snapSpeed','skipSame','highlight','autoWin',
+    'titleColor','titleStrokeColor','specTextColor','phoneNameColor',
+    'accentColor','winBgColor','winBorderColor','winBgAlpha',
+    'barBgColor','barLineColor','vsBoxColor','vsTextColor','vsSize',
+    'bgPreset','bgInner','bgOuter','bgDim','bgBlur','bgType','bgAngle','bgPat','bgPatA',
+    'showProgress','showCounter','progressIconMode','progressIconChar',
+    'progressPos','progColor','iconSize','channelInput','counterColor','perSpec',
+    'showSafeGuide','audioToggle','bgMusicMode','exportMode','xRes','xFps','xMbps'
+];
+
+function saveSettings(){
+    const s = {};
+    SETTINGS_FIELDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        s[id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (_) {}
+}
+function loadSettings(){
+    try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        SETTINGS_FIELDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el || s[id] === undefined) return;
+            if (el.type === 'checkbox') el.checked = !!s[id];
+            else {
+                if (el.tagName === 'SELECT') {
+                    const opt = Array.from(el.options).find(o => o.value === s[id]);
+                    if (opt) el.value = s[id];
+                } else el.value = s[id];
+            }
+        });
+    } catch (_) {}
+}
+function resetAll(){
+    try { localStorage.removeItem(SETTINGS_KEY); } catch (_) {}
+    location.reload();
+}
+document.querySelectorAll('#ui input, #ui select').forEach(el => {
+    el.addEventListener('change', saveSettings);
+    el.addEventListener('input', saveSettings);
+});
+
+/* =========================================================
+   UI STATE
+   ========================================================= */
+const q$ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function setStatus(text){
+    const msg = q$('statusMsg');
+    if (msg) msg.textContent = text;
+}
+
+/* =========================================================
+   AUDIO DECODING HELPERS
+   ========================================================= */
+let bgMusicBuffer = null;
+let customSfxBuffer = null;
+
+async function decodeAudioFile(file){
+    const arrayBuffer = await file.arrayBuffer();
+    const tmpCtx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+        return await tmpCtx.decodeAudioData(arrayBuffer);
+    } finally {
+        try { await tmpCtx.close(); } catch (_) {}
+    }
+}
+
+function updateAudioStatus(){
+    const parts = [];
+    if (q$('bgMusicMode').value === 'upload') {
+        parts.push(bgMusicBuffer ? `🎵 BG: ${bgMusicBuffer.duration.toFixed(1)}s (loop)` : '🎵 BG: waiting for file');
+    } else {
+        parts.push('🎵 BG: silent');
+    }
+    const style = q$('audioToggle').value;
+    if (customSfxBuffer) parts.push(`🔔 SFX: custom ${customSfxBuffer.duration.toFixed(2)}s`);
+    else if (style === 'off') parts.push('🔔 SFX: off');
+    else parts.push(`🔔 SFX: ${style}`);
+    if (hasWebCodecs && !('AudioEncoder' in window)) parts.push('⚠️ AudioEncoder unavailable — export will be silent');
+    q$('audio-status').textContent = parts.join(' · ');
+}
+
+q$('bgMusicMode').addEventListener('change', e => {
+    q$('bgMusicUploadRow').style.display = e.target.value === 'upload' ? 'flex' : 'none';
+    updateAudioStatus();
+    saveSettings();
+});
+q$('bgMusicFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) { bgMusicBuffer = null; updateAudioStatus(); return; }
+    try {
+        bgMusicBuffer = await decodeAudioFile(file);
+        updateAudioStatus();
+    } catch (_) {
+        alert('Could not decode BG music file.');
+        bgMusicBuffer = null;
+    }
+});
+q$('clearBgMusicBtn').addEventListener('click', () => {
+    bgMusicBuffer = null;
+    q$('bgMusicFile').value = '';
+    q$('bgMusicMode').value = 'none';
+    q$('bgMusicUploadRow').style.display = 'none';
+    updateAudioStatus();
+});
+
+q$('customSfxFile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) { customSfxBuffer = null; updateAudioStatus(); return; }
+    try {
+        customSfxBuffer = await decodeAudioFile(file);
+        updateAudioStatus();
+    } catch (_) {
+        alert('Could not decode custom SFX file.');
+        customSfxBuffer = null;
+    }
+});
+q$('clearSfxBtn').addEventListener('click', () => {
+    customSfxBuffer = null;
+    q$('customSfxFile').value = '';
+    updateAudioStatus();
+});
+q$('audioToggle').addEventListener('change', updateAudioStatus);
+
+/* =========================================================
+   ACCORDIONS
+   ========================================================= */
+document.querySelectorAll('.accordion-header').forEach(hdr=>{
+    hdr.addEventListener('click', ()=>{
+        const acc = hdr.parentElement;
+        acc.classList.toggle('open');
+    });
+});
+
+/* =========================================================
+   DATA
+   ========================================================= */
+let specs = [
+    { name: 'BATTERY CAPACITY', a: '7050 mAh', b: '7200 mAh', include: true, winnerMode: 'auto' },
+    { name: 'FAST CHARGING', a: '80W FlashCharge', b: '100W FlashCharge', include: true, winnerMode: 'auto' },
+    { name: 'DISPLAY REFRESH RATE', a: '120 Hz AMOLED', b: '144 Hz LTPO', include: true, winnerMode: 'auto' },
+    { name: 'MAIN REAR CAMERA', a: '50 MP OIS', b: '200 MP Periscope', include: true, winnerMode: 'auto' },
+    { name: 'ANTUTU BENCHMARK', a: '1,420,000', b: '1,850,000', include: true, winnerMode: 'auto' }
+];
+const phoneA = { name:'VIVO S2 5G' };
+const phoneB = { name:'VIVO V80 5G' };
+
+let bgCanvas = null;
+let uploadedBgImg = null;
+let timeline = [];
+let timelineTotal = 0;
+
+let rafId = 0, startTimeMs = 0, curSegIdx = -1, lastSegObj = null;
+let isRunning = false, isFinished = false;
+let previewLoopId = 0, isPreviewPlaying = false, previewStartMs = 0;
+let mediaRecorder = null, chunks = [], blobUrl = null;
+let fileName = 'phone_comparison.mp4';
+
+/* =========================================================
+   BACKGROUNDS
+   ========================================================= */
+const BG_PRESETS = {
+    ocean   : { inner:'#1a3a5c', outer:'#0d1f2d' },
+    slate   : { inner:'#2a3440', outer:'#12171c' },
+    midnight: { inner:'#1c2a42', outer:'#0a0f18' },
+    forest  : { inner:'#1a3a32', outer:'#0a1612' },
+    plum    : { inner:'#2e2438', outer:'#120e18' },
+    sand    : { inner:'#3a3228', outer:'#1a1510' },
+    charcoal: { inner:'#2a2e34', outer:'#0e1014' }
+};
+
+function buildBackground(){
+    const presetKey = q$('bgPreset').value;
+    let inner, outer;
+    if(presetKey === 'custom'){
+        inner = q$('bgInner').value;
+        outer = q$('bgOuter').value;
+    } else {
+        const p = BG_PRESETS[presetKey] || BG_PRESETS.ocean;
+        inner = p.inner; outer = p.outer;
+    }
+    bgCanvas = document.createElement('canvas');
+    bgCanvas.width = W; bgCanvas.height = H;
+    const g = bgCanvas.getContext('2d');
+
+    if(uploadedBgImg){
+        const blurPx = parseFloat(q$('bgBlur').value) || 0;
+        g.save();
+        if(blurPx > 0) g.filter = `blur(${blurPx}px)`;
+        const iw = uploadedBgImg.width, ih = uploadedBgImg.height;
+        const scale = Math.max(W / iw, H / ih);
+        const dw = iw * scale, dh = ih * scale;
+        g.drawImage(uploadedBgImg, (W - dw)/2, (H - dh)/2, dw, dh);
+        g.restore();
+    } else {
+        bgFill(g, inner, outer, presetKey);
+    }
+
+    const dimAlpha = (parseFloat(q$('bgDim').value) || 0) / 100;
+    if(dimAlpha > 0){
+        g.fillStyle = `rgba(0,0,0,${dimAlpha})`;
+        g.fillRect(0,0,W,H);
+    }
+    bgPattern(g); return bgCanvas;
+}
+
+q$('bgImgFile').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const fr = new FileReader();
+    fr.onload = ev=>{
+        const img = new Image();
+        img.onload = ()=>{ uploadedBgImg = img; buildBackground(); refreshPreview(); };
+        img.src = ev.target.result;
+    };
+    fr.readAsDataURL(file);
+});
+q$('clearBgImgBtn').addEventListener('click', ()=>{
+    uploadedBgImg = null;
+    q$('bgImgFile').value = '';
+    buildBackground(); refreshPreview();
+});
+
+/* =========================================================
+   DATA PARSING
+   ========================================================= */
+const LOWER_IS_BETTER = /thickness|weight|price|cost|charging time|charge time|latency|response time|delay|bezel|thick/i;
+
+function parseNum(s){
+    if(s === null || s === undefined) return NaN;
+    const m = String(s).replace(/,/g,'').match(/-?\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : NaN;
+}
+function mapWinnerFromCsv(val){
+    const v = String(val || '').trim().toLowerCase();
+    if(v === '1' || v === 'a' || v === 'phone a' || v === 'phone1') return 'a';
+    if(v === '2' || v === 'b' || v === 'phone b' || v === 'phone2') return 'b';
+    if(v === 'tie' || v === 'none' || v === 'equal' || v === '-') return 'none';
+    return 'auto';
+}
+function computeWinner(spec){
+    if(spec.winnerMode === 'none') return null;
+    if(spec.winnerMode === 'a') return 'a';
+    if(spec.winnerMode === 'b') return 'b';
+    if(spec.csvWin) return spec.csvWin === 'none' ? null : spec.csvWin;
+    if(!(q$('autoWin') || {}).checked) return null;
+
+    const A = String(spec.a).trim(), B = String(spec.b).trim();
+    if(!A || !B || A === '—' || B === '—') return null;
+    if(A.toLowerCase() === B.toLowerCase()) return null;
+
+    const na = parseNum(A), nb = parseNum(B);
+    if(Number.isFinite(na) && Number.isFinite(nb) && na !== nb){
+        if(LOWER_IS_BETTER.test(spec.name)) return na < nb ? 'a' : 'b';
+        return na > nb ? 'a' : 'b';
+    }
+    const aYes = /^(yes|supported|present|available)/i.test(A), aNo = /^(no|not|none)/i.test(A);
+    const bYes = /^(yes|supported|present|available)/i.test(B), bNo = /^(no|not|none)/i.test(B);
+    if(aYes && bNo) return 'a';
+    if(bYes && aNo) return 'b';
+    return null;
+}
+function updateDataInfo(fname){
+    const info = q$('dataInfo');
+    info.style.display = 'block';
+    info.innerHTML =
+        `✅ <b>${specs.length}</b> specs loaded from “${escapeHtml(fname)}”<br>` +
+        `📱 <b>${escapeHtml(phoneA.name)}</b> vs <b>${escapeHtml(phoneB.name)}</b>`;
+}
+function renderSpecList(){
+    const wrap = q$('specList');
+    wrap.innerHTML = '';
+    specs.forEach((s,i)=>{
+        const row = document.createElement('div');
+        row.className = 'spec-row';
+        const checked = s.include ? 'checked' : '';
+        row.innerHTML =
+            `<input type="checkbox" data-i="${i}" data-k="include" ${checked}>` +
+            `<span class="spec-name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>` +
+            `<span class="spec-vals">${escapeHtml(s.a)} <b>vs</b> ${escapeHtml(s.b)}</span>` +
+            `<button type="button" class="btn-secondary pimg" data-i="${i}" title="Spec photo" style="width:auto;padding:3px 7px;margin:0">${s.img?"🖼":"📷"}</button><select data-i="${i}" data-k="winner">
+                <option value="auto">Auto (CSV / off)</option>
+                <option value="a">A wins</option>
+                <option value="b">B wins</option>
+                <option value="none">Tie</option>
+             </select>`;
+        row.querySelector('select').value = s.winnerMode;
+        wrap.appendChild(row);
+    });
+}
+q$('specList').addEventListener('change', e=>{
+    const i = +e.target.dataset.i;
+    const k = e.target.dataset.k;
+    if(Number.isNaN(i) || !specs[i]) return;
+    if(k === 'include') specs[i].include = e.target.checked;
+    if(k === 'winner')  specs[i].winnerMode = e.target.value;
+    updateEstimate(); refreshPreview();
+});
+function updateEstimate(){
+    const per = parseFloat(q$('perSpec').value) || 2.6;
+    const skipSame = q$('skipSame').checked;
+    const n = specs.filter(s => s.include && !(skipSame && s.a.toLowerCase() === s.b.toLowerCase())).length;
+    const total = n * per;
+    if(n > 0){
+        setStatus(`🎬 ${n} specs • ${total.toFixed(1)}s total video`);
+    } else {
+        setStatus('');
+    }
+}
+
+/* =========================================================
+   SCENE DRAWING
+   ========================================================= */
+function drawSafeZoneGuide(){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([14, 10]);
+    const zoneW = 740, zoneH = 730;
+    const zx = 960 - zoneW/2, zy = 140;
+    roundRect(ctx, zx, zy, zoneW, zoneH, 28);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.font = `700 26px ${BODY_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('EMPTY CENTER SPACE FOR YOUR MANUAL PHONE PNGs & VS', 960, zy + zoneH/2);
+    ctx.restore();
+}
+
+function drawSpecTitle(text, p){
+    const animMode = q$('titleAnimToggle').value;
+    const baseY    = parseFloat(q$('titleY').value) || 72;
+    const maxFont  = parseFloat(q$('titleSize').value) || 72;
+    const tColor   = q$('titleColor').value;
+    const sColor   = q$('titleStrokeColor').value;
+
+    let alpha = 1, y = baseY, sc = 1;
+    if(animMode === 'fade'){
+        const inP  = smootherstep(clamp(p/0.16, 0, 1));
+        const outP = smootherstep(clamp((p-0.86)/0.14, 0, 1));
+        alpha = inP * (1 - outP);
+    } else if(animMode === 'drop'){
+        const inP  = easeOutCubic(clamp(p/0.18, 0, 1));
+        const outP = smootherstep(clamp((p-0.86)/0.14, 0, 1));
+        alpha = inP * (1 - outP);
+        y = baseY - (1 - inP)*50 - outP*35;
+        sc = 0.92 + 0.08*inP;
+    }
+
+    if(alpha <= 0.01) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(960, y);
+    ctx.scale(sc, sc);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    let size = maxFont;
+    ctx.font = `900 ${size}px ${TITLE_FONT}`;
+    const upper = String(text).toUpperCase();
+    while(ctx.measureText(upper).width > 1680 && size > 30){
+        size -= 2;
+        ctx.font = `900 ${size}px ${TITLE_FONT}`;
+    }
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = Math.max(8, Math.round(size * 0.19));
+    ctx.strokeStyle = sColor;
+    ctx.strokeText(upper, 0, 0);
+    ctx.fillStyle = tColor;
+    ctx.fillText(upper, 0, 0);
+    ctx.restore();
+}
+
+function computeSpecAnimState(p, side){
+    const style = q$('specAnimStyle').value; { const X = extraAnim(style,p,side); if(X) return X; }
+    const snapOutDur = (parseFloat(q$('snapSpeed').value) || 14) / 100;
+    const outStart = 1 - snapOutDur;
+    const inDur = 0.20;
+
+    let dx = 0, dy = 0, scaleX = 1, scaleY = 1, alpha = 1;
+
+    if(style === 'none'){ return { dx, dy, scaleX, scaleY, alpha: 1 }; }
+
+    const inRaw  = clamp(p / inDur, 0, 1);
+    const outRaw = clamp((p - outStart) / snapOutDur, 0, 1);
+
+    if(style === 'slideUpSnapDown'){
+        if(p < inDur){
+            const eIn = easeOutBack(inRaw);
+            dy = (1 - eIn) * 185;
+            alpha = smootherstep(clamp(inRaw * 1.35, 0, 1));
+        } else if(p > outStart){
+            const eOut = Math.pow(outRaw, 2.3);
+            dy = eOut * 240;
+            scaleY = 1 - outRaw * 0.15;
+            alpha = 1 - Math.pow(outRaw, 1.6);
+        }
+    } else if(style === 'slideSideSnapDown'){
+        const dir = side === 'left' ? -1 : 1;
+        if(p < inDur){
+            const eIn = easeOutBack(inRaw);
+            dx = dir * (1 - eIn) * 220;
+            alpha = smootherstep(inRaw);
+        } else if(p > outStart){
+            const eOut = Math.pow(outRaw, 2.2);
+            dy = eOut * 230;
+            alpha = 1 - outRaw;
+        }
+    } else if(style === 'popSnapDown'){
+        if(p < inDur){
+            const eIn = easeOutBack(inRaw);
+            scaleX = scaleY = 0.25 + 0.75 * eIn;
+            alpha = smootherstep(inRaw);
+        } else if(p > outStart){
+            const eOut = easeInBack(outRaw);
+            dy = eOut * 210;
+            scaleX = scaleY = Math.max(0.1, 1 - outRaw * 0.45);
+            alpha = 1 - outRaw;
+        }
+    } else if(style === 'flipSnapDown'){
+        if(p < inDur){
+            const eIn = easeOutCubic(inRaw);
+            scaleY = Math.max(0.05, eIn);
+            dy = (1 - eIn) * 70;
+            alpha = smootherstep(inRaw);
+        } else if(p > outStart){
+            const eOut = Math.pow(outRaw, 2.2);
+            dy = eOut * 220;
+            scaleY = Math.max(0.05, 1 - outRaw);
+            alpha = 1 - outRaw;
+        }
+    } else if(style === 'zoomFade'){
+        const eIn = smootherstep(inRaw);
+        const eOut = smootherstep(outRaw);
+        scaleX = scaleY = 0.84 + 0.16 * eIn - 0.14 * eOut;
+        alpha = eIn * (1 - eOut);
+    }
+
+    return { dx, dy, scaleX, scaleY, alpha };
+}
+
+function drawValueBlock(text, cx, cy, maxW, isWinner, anim){
+    if(anim.alpha <= 0.01) return;
+
+    const maxFont       = parseFloat(q$('specSize').value) || 64;
+    const specTextColor = q$('specTextColor').value;
+    const winTextColor  = q$('accentColor').value;
+    const winBgColor    = q$('winBgColor').value;
+    const winBorderCol  = q$('winBorderColor').value;
+    const winBgAlpha    = (parseFloat(q$('winBgAlpha').value) || 45) / 100;
+
+    ctx.save();
+    ctx.globalAlpha = clamp(anim.alpha, 0, 1);
+    ctx.translate(cx + anim.dx, cy + anim.dy);
+    ctx.scale(anim.scaleX, anim.scaleY);
+    if(anim.clip){ const c = anim.clip, R = maxW/2 + 70; ctx.beginPath(); if(c.t === 'i') ctx.arc(0,0,Math.max(1,R*c.v*1.3),0,7); else ctx.rect(c.d < 0 ? -R : R-2*R*c.v, -200, 2*R*c.v, 400); ctx.clip(); }
+
+    const fit = fitTextBlock(text, maxW, 3, maxFont, 24, '900', TITLE_FONT);
+    const lh = fit.size * 1.18;
+    const totalH = fit.lines.length * lh;
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    if(isWinner){
+        let maxLineW = 0;
+        fit.lines.forEach(l => { maxLineW = Math.max(maxLineW, ctx.measureText(l).width); });
+        const pw = Math.min(maxW + 64, maxLineW + 76);
+        const ph = totalH + 44;
+
+        ctx.save();
+        ctx.shadowColor = winBorderCol;
+        ctx.shadowBlur = 36;
+        ctx.fillStyle = hexA(winBgColor, winBgAlpha);
+        roundRect(ctx, -pw/2, -ph/2, pw, ph, 22);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.strokeStyle = hexA(winBorderCol, 0.75);
+        ctx.lineWidth = 3.5;
+        roundRect(ctx, -pw/2, -ph/2, pw, ph, 22);
+        ctx.stroke();
+
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 9;
+        ctx.strokeStyle = 'rgba(0,0,0,.8)';
+        ctx.fillStyle = winTextColor;
+        fit.lines.forEach((l,i)=>{
+            const yy = -((fit.lines.length-1)*lh)/2 + i*lh;
+            ctx.strokeText(l, 0, yy);
+            ctx.fillText(l, 0, yy);
+        });
+    } else {
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 7;
+        ctx.strokeStyle = 'rgba(0,0,0,.55)';
+        ctx.fillStyle = specTextColor;
+        fit.lines.forEach((l,i)=>{
+            const yy = -((fit.lines.length-1)*lh)/2 + i*lh;
+            ctx.strokeText(l, 0, yy);
+            ctx.fillText(l, 0, yy);
+        });
+    }
+    ctx.restore();
+}
+
+function drawSpecScene(spec, p){
+    WR('title', 960, parseFloat(q$('titleY').value) || 72, () => drawSpecTitle(spec.name, p));
+
+    const highlightOn = q$('highlight').checked;
+    const w = highlightOn ? computeWinner(spec) : null;
+
+    const edgeX = parseFloat(q$('specX').value) || 265;
+    const specY = parseFloat(q$('specY').value) || 540;
+    const maxW  = parseFloat(q$('specW').value) || 440;
+
+    const animL = computeSpecAnimState(p, 'left');
+    const animR = computeSpecAnimState(p, 'right');
+
+    WR('valA', edgeX, specY, () => drawValueBlock(spec.a, edgeX, specY, maxW, w === 'a', animL));
+    WR('valB', W - edgeX, specY, () => drawValueBlock(spec.b, W - edgeX, specY, maxW, w === 'b', animR));
+}
+
+/* =========================================================
+   ELEMENT STUDIO HOOKS (must exist for WR())
+   ========================================================= */
+const EK = [['title','Title',960,90],['valA','Left spec values',265,540],['valB','Right spec values',1655,540],['names','Phone names',960,1015],['vs','VS badge',960,1015],['prog','Progress bar',960,950],['count','Spec counter',34,922],['chan','Watermark',1890,922],['tally','Winner tally',960,165]];
+const el = {}; EK.forEach(k => { el[k[0]] = { show:true, dx:0, dy:0, sc:100, op:100 }; });
+const GA = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'globalAlpha');
+function EP(k,ax,ay){ const e = el[k]; ctx.translate(e.dx,e.dy); if(e.sc !== 100){ ctx.translate(ax,ay); ctx.scale(e.sc/100,e.sc/100); ctx.translate(-ax,-ay); } }
+function WR(k,ax,ay,fn){
+  const e = el[k]; if(!e.show) return; ctx.save(); EP(k,ax,ay);
+  if(e.op !== 100){ const m = e.op/100; GA.set.call(ctx, GA.get.call(ctx)*m);
+    Object.defineProperty(ctx,'globalAlpha',{ configurable:true, get(){ return GA.get.call(ctx); }, set(v){ GA.set.call(ctx, v*m); } }); }
+  try{ fn(); } finally { delete ctx.globalAlpha; ctx.restore(); }
+}
+
+/* =========================================================
+   PHONE PNG LAYERS + DRAG
+   ========================================================= */
+const ph = { a:{ img:null, src:'', x:700, y:500, s:100, rot:0, op:100, glow:0, sh:35, show:true },
+             b:{ img:null, src:'', x:1220, y:500, s:100, rot:0, op:100, glow:0, sh:35, show:true }, float:true, winGlow:true, base:640, sel:'a' };
+function phBox(p){ const h = ph.base*p.s/100; return { h:h, w: p.img && p.img.naturalHeight ? h*p.img.naturalWidth/p.img.naturalHeight : h*.5 }; }
+function setPhImg(k, src){ const im = new Image(); im.onload = () => { ph[k].img = im; ph[k].src = src; refreshPreview(); }; im.src = src; }
+let drag = null; const pc = previewCanvas; pc.style.touchAction = 'none';
+const ptr = e => { const r = pc.getBoundingClientRect(); return [(e.clientX-r.left)*W/r.width, (e.clientY-r.top)*H/r.height]; };
+pc.addEventListener('pointerdown', e => { const xy = ptr(e);
+  for(const k of ['b','a']){ const p = ph[k], b = phBox(p);
+    if(p.show && p.img && Math.abs(xy[0]-p.x) < b.w/2 && Math.abs(xy[1]-p.y) < b.h/2){ drag = { k:k, dx:xy[0]-p.x, dy:xy[1]-p.y }; ph.sel = k; pc.setPointerCapture(e.pointerId); syncAll(); refreshPreview(); break; } } });
+pc.addEventListener('pointermove', e => { if(!drag) return; const xy = ptr(e), p = ph[drag.k]; p.x = Math.round(xy[0]-drag.dx); p.y = Math.round(xy[1]-drag.dy); syncAll(); refreshPreview(); });
+pc.addEventListener('pointerup', () => { drag = null; });
+
+function drawPhones(spec, prev, t){ _drawPhones(spec, prev, t); }
+let _drawPhones = function(spec, prev, t){
+  const win = q$('highlight').checked ? computeWinner(spec) : null;
+  ['a','b'].forEach(k => {
+    const p = ph[k]; if(!p.show || !p.img || !p.img.naturalWidth) return;
+    const b = phBox(p), PA = phAnim(k,t), bob = PA.dy, gl = p.glow + (ph.winGlow && win === k ? +q$('wgSize').value : 0);
+    ctx.save(); ctx.translate(p.x + PA.dx, p.y + bob); ctx.scale(PA.sc,PA.sc); ctx.rotate((p.rot+PA.rot)*Math.PI/180); ctx.globalAlpha = p.op/100;
+    if(gl > 0){ ctx.shadowColor = q$('wgColor').value; ctx.shadowBlur = gl*2; }
+    else if(p.sh > 0){ ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = p.sh; ctx.shadowOffsetY = p.sh/2; }
+    ctx.drawImage(p.img, -b.w/2, -b.h/2, b.w, b.h); ctx.restore();
+    if(prev && ph.sel === k){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180); ctx.strokeStyle = '#3dd68c'; ctx.lineWidth = 3; ctx.setLineDash([12,8]); ctx.strokeRect(-b.w/2,-b.h/2,b.w,b.h); ctx.restore(); }
+  });
+};
+
+/* =========================================================
+   CHROME
+   ========================================================= */
+const X3={nAx:0,nAy:0,nAs:100,nBx:0,nBy:0,nBs:100,vsB:4,vsG:24,vsS:100,vsX:0,vsY:0,vsR:0,wbS:90};
+let vsImg = null;
+
+function drawFittedName(text, cx, cy, maxW, startSize, color){
+    let size = startSize;
+    ctx.font = `900 ${size}px ${TITLE_FONT}`;
+    const up = String(text).toUpperCase();
+    while(ctx.measureText(up).width > maxW && size > 20){ size -= 2; ctx.font = `900 ${size}px ${TITLE_FONT}`; }
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle = color;
+    ctx.fillText(up, cx, cy);
+}
+
+function drawProgressBarWithIcons(t, barY){
+    if(!q$('showProgress').checked) return;
+
+    const prog = timelineTotal > 0 ? clamp(t / timelineTotal, 0, 1) : 0.5;
+    const posMode   = q$('progressPos').value;
+    const iconMode  = q$('progressIconMode').value;
+    const iconChar  = q$('progressIconChar').value;
+    const progColor = q$('progColor').value;
+    const iconSize  = parseFloat(q$('iconSize').value) || 22;
+
+    const py = posMode === 'top' ? 14 : (barY - 12);
+    const barH = 8;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(0, py - barH/2, W, barH);
+
+    const fillW = Math.max(4, W * prog);
+    const g = ctx.createLinearGradient(0, 0, fillW, 0);
+    g.addColorStop(0, progColor);
+    g.addColorStop(1, '#ffffff');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, py - barH/2, fillW, barH);
+
+    if(iconMode === 'streamAndTip' || iconMode === 'streamOnly'){
+        const spacing = Math.max(48, iconSize * 2.8);
+        const speedPxPerSec = 95;
+        const offset = ((t / 1000) * speedPxPerSec) % spacing;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, py - 40, fillW, 80); ctx.clip();
+        ctx.font = `${iconSize}px ${BODY_FONT}`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.shadowColor = progColor; ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ffffff';
+        for(let x = offset; x < fillW - iconSize*0.6; x += spacing){
+            const bob = Math.sin((t / 220) + x * 0.05) * 2.5;
+            ctx.fillText(iconChar, x, py + bob);
+        }
+        ctx.restore();
+    }
+
+    if(iconMode === 'streamAndTip' || iconMode === 'tipOnly'){
+        const tipX = clamp(fillW, iconSize*0.6, W - iconSize*0.6);
+        const pulse = 1 + Math.sin(t / 140) * 0.12;
+        ctx.save();
+        ctx.translate(tipX, py); ctx.scale(pulse, pulse);
+        ctx.shadowColor = progColor; ctx.shadowBlur = 18;
+        ctx.font = `${Math.round(iconSize * 1.25)}px ${BODY_FONT}`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(iconChar, 0, 0);
+        ctx.restore();
+    }
+    ctx.restore();
+}
+
+function drawVS(cx,cy,c1,tc,size,t){
+    const sh=q$('vsShape').value, pm=q$('vsPulse').value,sg=lastSegObj,p=sg?clamp((t-sg.start)/sg.dur,0,1):1;
+    let sc=1,rot=0,jx=0,jy=0;
+    if(pm==='heart')sc=1+.1*Math.pow(Math.max(0,Math.sin(t/190)),3);
+    else if(pm==='spin')rot=(1-easeOutCubic(p/.25))*Math.PI*4;
+    else if(pm==='jitter'){jx=Math.sin(t*.9)*3;jy=Math.cos(t*1.3)*3;}
+    const R=Math.max(78,size*1.35),g2=q$('vsFill2')?q$('vsFill2').value:'#7c4dff',bw=X3.vsB,gl=X3.vsG;
+    ctx.save();ctx.translate(cx+jx+(vsImg?X3.vsX:0),cy+jy+(vsImg?X3.vsY:0));ctx.scale(sc,sc);ctx.rotate(rot);
+    if(vsImg){ctx.rotate(X3.vsR*Math.PI/180);const k=X3.vsS/100*220/Math.max(vsImg.naturalWidth,vsImg.naturalHeight),w=vsImg.naturalWidth*k,h=vsImg.naturalHeight*k;ctx.shadowColor=g2;ctx.shadowBlur=gl;ctx.drawImage(vsImg,-w/2,-h/2,w,h);ctx.restore();return;}
+    if(sh==='box'){ctx.fillStyle=c1;ctx.fillRect(-66,-65,132,130);}
+    else if(sh!=='text'){const P={hex:[0,1,2,3,4,5].map(i=>[R*Math.cos(i*Math.PI/3-Math.PI/2),R*Math.sin(i*Math.PI/3-Math.PI/2)]),diamond:[[0,-R],[R*.8,0],[0,R],[-R*.8,0]],shield:[[-R*.85,-R*.8],[R*.85,-R*.8],[R*.85,R*.1],[0,R],[-R*.85,R*.1]]}[sh];
+      ctx.beginPath();if(P)P.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]));else ctx.arc(0,0,R,0,7);ctx.closePath();
+      const gr=ctx.createLinearGradient(0,-R,0,R);gr.addColorStop(0,c1);gr.addColorStop(1,g2);ctx.shadowColor=g2;ctx.shadowBlur=gl;ctx.fillStyle=gr;ctx.fill();ctx.shadowBlur=0;
+      if(bw>0){ctx.lineWidth=bw;ctx.strokeStyle=q$('vsBorderC')?q$('vsBorderC').value:'#fff';ctx.lineJoin='round';ctx.stroke();}}
+    ctx.font='900 '+size+'px '+TITLE_FONT;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=sh==='text'?c1:tc;
+    if(sh==='text'){ctx.shadowColor=g2;ctx.shadowBlur=gl;ctx.lineWidth=12;ctx.strokeStyle='#000';ctx.lineJoin='round';ctx.strokeText('VS',0,3);}
+    ctx.fillText('VS',0,3);ctx.restore();
+}
+
+function drawChrome(t){
+    const barY = 950, barH = 130, vsW = 132;
+    const barBgColor     = q$('barBgColor').value;
+    const barLineColor   = q$('barLineColor').value;
+    const vsBoxColor     = q$('vsBoxColor').value;
+    const vsTextColor    = q$('vsTextColor').value;
+    const phoneNameColor = q$('phoneNameColor').value;
+    const counterColor   = q$('counterColor').value;
+    const vsSize         = parseFloat(q$('vsSize').value) || 58;
+
+    ctx.fillStyle = barBgColor;
+    ctx.fillRect(0, barY, W, barH);
+    ctx.fillStyle = barLineColor;
+    ctx.fillRect(0, barY, W, 5);
+
+    WR('vs', 960, barY + barH/2, () => drawVS(960, barY + barH/2, vsBoxColor, vsTextColor, vsSize, t));
+
+    const halfW = 960 - vsW/2 - 60;
+    WR('names', 960, barY + barH/2, () => {
+        drawFittedName(phoneA.name, 470+X3.nAx, barY + barH/2 + 2+X3.nAy, halfW, 56*X3.nAs/100, phoneNameColor);
+        drawFittedName(phoneB.name, 1450+X3.nBx, barY + barH/2 + 2+X3.nBy, halfW, 56*X3.nBs/100, phoneNameColor);
+    });
+
+    WR('prog', 960, barY, () => drawProgressBarWithIcons(t, barY));
+
+    if(q$('showCounter').checked && el.count.show){
+        const total = timeline.length;
+        const idx = timeline.indexOf(lastSegObj) + 1;
+        if(idx > 0 && total > 0){
+            ctx.save();
+            ctx.globalAlpha = 0.85 * el.count.op/100; EP('count', 34, 922);
+            ctx.font = `800 25px ${BODY_FONT}`;
+            ctx.fillStyle = counterColor;
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 6;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+            ctx.fillText(`${idx} / ${total}`, 34, 922);
+            ctx.restore();
+        }
+    }
+
+    const ch = q$('channelInput').value.trim();
+    if(ch && el.chan.show){
+        ctx.save();
+        ctx.globalAlpha = 0.65 * el.chan.op/100; EP('chan', 1890, 922);
+        ctx.font = `800 26px ${BODY_FONT}`;
+        ctx.fillStyle = counterColor;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(ch, 1890, 922);
+        ctx.restore();
+    }
+}
+
+/* =========================================================
+   PHONE MOTION + WINNER BADGE
+   ========================================================= */
+function phAnim(k,t){
+    const m=q$('phMotion')?q$('phMotion').value:'hover',s=k==='a'?0:1.5,r={dx:0,dy:0,rot:0,sc:1},
+          sg=lastSegObj,p=sg?clamp((t-sg.start)/sg.dur,0,1):.5,
+          w=sg&&q$('highlight').checked?computeWinner(sg.spec):null;
+    if(m==='hover'){if(ph.float)r.dy=Math.sin(t/600+s)*8;}
+    else if(m==='pendulum'){r.rot=Math.sin(t/900+s)*5;r.dy=Math.sin(t/700+s)*10;}
+    else if(m==='orbit'){r.dx=Math.sin(t/800+s)*24;r.dy=Math.sin(t/400+s)*12;}
+    else if(m==='bounce')r.dy=-Math.abs(Math.sin(p*Math.PI*4))*30*(1-p);
+    else if(m==='winpop'){if(w===k)r.sc=1+.14*Math.sin(clamp((p-.1)/.3,0,1)*Math.PI);}
+    else if(m==='slidein')r.dx=(k==='a'?-1:1)*(1-easeOutCubic(p/.2))*320;
+    return r;
+}
+function winBadge(x,y,t){
+    const icEl=q$('wbIcon'); if(!icEl) return;
+    const ic=icEl.value; if(ic==='none')return;
+    const m=(q$('wbAnim')?q$('wbAnim').value:'pop');
+    const sg=lastSegObj,p=sg?clamp((t-sg.start)/sg.dur,0,1):1;
+    let sc=1,dy=0,rot=0;
+    if(m==='pop')sc=easeOutBack(p/.18);
+    else if(m==='bounce')dy=-Math.abs(Math.sin(t/260))*18;
+    else if(m==='spin')rot=t/300;
+    else if(m==='pulse')sc=1+Math.sin(t/160)*.15;
+    const wgColorEl=q$('wgColor'); if(!wgColorEl) return;
+    ctx.save();ctx.translate(x,y+dy);ctx.scale(sc,sc);ctx.rotate(rot);
+    ctx.font=X3.wbS+'px '+BODY_FONT;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor=wgColorEl.value;ctx.shadowBlur=20;
+    ctx.fillText(ic,0,0);ctx.restore();
+}
+
+/* =========================================================
+   TIMELINE
+   ========================================================= */
+function buildTimeline(){
+    const perSpec  = clamp(parseFloat(q$('perSpec').value)||2.6, 0.8, 12);
+    const skipSame = q$('skipSame').checked;
+    const list = specs.filter(s => s.include && !(skipSame && s.a.toLowerCase() === s.b.toLowerCase()));
+    timeline = [];
+    let t = 0;
+    list.forEach(sp=>{ timeline.push({ type:'spec', start:t, dur:perSpec*1000, spec:sp }); t += perSpec*1000; });
+    timelineTotal = t;
+    return list;
+}
+function findSeg(t){
+    if(!timeline.length) return null;
+    let i = curSegIdx >= 0 ? curSegIdx : 0;
+    if(i >= timeline.length) i = timeline.length - 1;
+    while(i > 0 && t < timeline[i].start) i--;
+    while(i < timeline.length-1 && t >= timeline[i].start + timeline[i].dur) i++;
+    curSegIdx = i;
+    return timeline[i];
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function render(t, isPreviewMode = false, silent = false){
+    t = clamp(t, 0, Math.max(0, timelineTotal - 1));
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0,0,W,H);
+    if(bgCanvas) ctx.drawImage(bgCanvas,0,0,W,H);
+    if(isPreviewMode && q$('showSafeGuide').checked) drawSafeZoneGuide();
+    if(!timeline.length) return;
+
+    const seg = findSeg(t);
+    if(!isPreviewMode && seg !== lastSegObj && !silent){
+        lastSegObj = seg;
+        playSound();
+    } else {
+        lastSegObj = seg;
+    }
+
+    const local = seg.dur > 0 ? clamp((t - seg.start)/seg.dur, 0, 1) : 0.5;
+    drawPhones(seg.spec, isPreviewMode, t);
+    drawSpecScene(seg.spec, local);
+    drawChrome(t);
+
+    if(isPreviewMode){ pCtx.drawImage(canvas, 0, 0, previewCanvas.width, previewCanvas.height); }
+}
+
+function refreshPreview(){
+    if(isRunning) return;
+    phoneA.name = q$('nameA').value.trim() || 'Phone A';
+    phoneB.name = q$('nameB').value.trim() || 'Phone B';
+    buildTimeline();
+    const pct = (parseFloat(q$('previewScrub').value) || 0) / 100;
+    const t = pct * timelineTotal;
+    q$('previewTimeLabel').textContent = `${(t/1000).toFixed(1)}s`;
+    render(t, true);
+}
+
+/* =========================================================
+   PREVIEW SCRUB + PLAY
+   ========================================================= */
+const previewPlayBtn = q$('previewPlayBtn');
+const previewScrub   = q$('previewScrub');
+previewPlayBtn.addEventListener('click', ()=>{
+    if(isPreviewPlaying){ stopPreviewPlay(); }
+    else {
+        isPreviewPlaying = true;
+        previewPlayBtn.textContent = '⏸ Pause';
+        buildTimeline();
+        const startPct = (parseFloat(previewScrub.value) || 0) / 100;
+        const offsetMs = (startPct >= 0.99 ? 0 : startPct) * timelineTotal;
+        previewStartMs = performance.now() - offsetMs;
+        const tick = now => {
+            if(!isPreviewPlaying || isRunning) return;
+            const elapsed = (now - previewStartMs) % Math.max(1000, timelineTotal);
+            const pct = timelineTotal > 0 ? (elapsed / timelineTotal) * 100 : 0;
+            previewScrub.value = pct;
+            q$('previewTimeLabel').textContent = `${(elapsed/1000).toFixed(1)}s`;
+            render(elapsed, true);
+            previewLoopId = requestAnimationFrame(tick);
+        };
+        previewLoopId = requestAnimationFrame(tick);
+    }
+});
+function stopPreviewPlay(){
+    isPreviewPlaying = false;
+    previewPlayBtn.textContent = '▶ Play';
+    if(previewLoopId) cancelAnimationFrame(previewLoopId);
+}
+previewScrub.addEventListener('input', ()=>{ stopPreviewPlay(); refreshPreview(); });
+
+const LIVE_INPUTS = [
+    'nameA','nameB','specAnimStyle','titleAnimToggle','titleY','titleSize',
+    'specX','specY','specSize','specW','snapSpeed','skipSame','highlight',
+    'titleColor','titleStrokeColor','specTextColor','phoneNameColor',
+    'accentColor','winBgColor','winBorderColor','winBgAlpha',
+    'barBgColor','barLineColor','vsBoxColor','vsTextColor','vsSize',
+    'bgPreset','bgInner','bgOuter','bgDim','bgBlur',
+    'showProgress','showCounter','progressIconMode','progressIconChar',
+    'progressPos','progColor','iconSize','channelInput','counterColor','perSpec',
+    'showSafeGuide'
+];
+LIVE_INPUTS.forEach(id=>{
+    const el2 = q$(id);
+    if(!el2) return;
+    el2.addEventListener('input', ()=>{
+        updateSliderLabels();
+        if(['bgPreset','bgInner','bgOuter','bgDim','bgBlur'].includes(id)){
+            if(id === 'bgInner' || id === 'bgOuter'){ q$('bgPreset').value = 'custom'; }
+            buildBackground();
+        }
+        if(['perSpec','skipSame'].includes(id)) updateEstimate();
+        refreshPreview();
+    });
+});
+
+function updateSliderLabels(){
+    const set = (id,val)=>{ const e=q$(id); if(e) e.textContent=val; };
+    set('titleYVal', q$('titleY').value + 'px');
+    set('titleSizeVal', q$('titleSize').value + 'px');
+    set('specXVal', q$('specX').value + 'px');
+    set('specYVal', q$('specY').value + 'px');
+    set('specSizeVal', q$('specSize').value + 'px');
+    set('specWVal', q$('specW').value + 'px');
+    set('snapSpeedVal', `Fast (${q$('snapSpeed').value}%)`);
+    set('winBgAlphaVal', q$('winBgAlpha').value + '%');
+    set('bgDimVal', q$('bgDim').value + '%');
+    set('bgBlurVal', q$('bgBlur').value + 'px');
+    set('iconSizeVal', q$('iconSize').value + 'px');
+    set('vsSizeVal', q$('vsSize').value + 'px');
+}
+
+/* =========================================================
+   LIVE PREVIEW AUDIO (real-time)
+   ========================================================= */
+let liveAudioCtx = null;
+let liveAudioMaster = null;
+let liveAudioDest = null;
+let liveBgSrc = null;
+
+function initLiveAudio(){
+    if(liveAudioCtx){
+        if(liveAudioCtx.state === 'suspended') liveAudioCtx.resume();
+        return;
+    }
+    try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        liveAudioCtx = new AC();
+        liveAudioDest = liveAudioCtx.createMediaStreamDestination();
+        liveAudioMaster = liveAudioCtx.createGain();
+        liveAudioMaster.gain.value = 0.85;
+        liveAudioMaster.connect(liveAudioDest);
+        liveAudioMaster.connect(liveAudioCtx.destination);
+
+        if (q$('bgMusicMode').value === 'upload' && bgMusicBuffer) {
+            const src = liveAudioCtx.createBufferSource();
+            src.buffer = bgMusicBuffer;
+            src.loop = true;
+            const g = liveAudioCtx.createGain();
+            g.gain.value = 0.35;
+            src.connect(g).connect(liveAudioMaster);
+            src.start(0);
+            liveBgSrc = src;
+        }
+    } catch (e) { console.warn('Live audio init failed:', e); }
+}
+function stopLiveAudio(){
+    if(liveBgSrc){ try { liveBgSrc.stop(); } catch(_){} liveBgSrc = null; }
+}
+
+let chimeCounter = 0;
+function playSound(){
+    if (q$('audioToggle').value === 'off' && !customSfxBuffer) return;
+    if (!liveAudioCtx || !liveAudioMaster) return;
+    const now = liveAudioCtx.currentTime;
+    if (customSfxBuffer) {
+        try {
+            const src = liveAudioCtx.createBufferSource();
+            src.buffer = customSfxBuffer;
+            const g = liveAudioCtx.createGain();
+            g.gain.value = 0.5;
+            src.connect(g).connect(liveAudioMaster);
+            src.start(now);
+        } catch (_) {}
+        return;
+    }
+    const style = q$('audioToggle').value;
+    scheduleSfxOnCtx(liveAudioCtx, liveAudioMaster, now, style, chimeCounter++);
+}
+
+/* =========================================================
+   SFX SCHEDULER (works for both live and offline ctx)
+   ========================================================= */
+function scheduleSfxOnCtx(actx, dest, whenSec, style, index) {
+    if (style === 'chime') {
+        const step = index % 8;
+        const scale = [0, 2, 4, 7, 9, 12, 16, 19];
+        const base = 392 * Math.pow(2, scale[step]/12);
+        const partials = [
+            { m:1.0,  a:1.00, d:0.9, t:'sine' },
+            { m:2.01, a:0.40, d:0.6, t:'triangle' },
+            { m:3.02, a:0.16, d:0.4, t:'sine' }
+        ];
+        partials.forEach(p => {
+            const o = actx.createOscillator();
+            o.type = p.t;
+            o.frequency.setValueAtTime(base*p.m, whenSec);
+            const g = actx.createGain();
+            g.gain.setValueAtTime(0.0001, whenSec);
+            g.gain.exponentialRampToValueAtTime(0.055*p.a, whenSec+0.012);
+            g.gain.exponentialRampToValueAtTime(0.0001, whenSec+p.d);
+            o.connect(g).connect(dest);
+            o.start(whenSec); o.stop(whenSec+p.d+0.08);
+        });
+    } else if (style === 'whoosh') {
+        const o = actx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(180, whenSec);
+        o.frequency.exponentialRampToValueAtTime(80, whenSec+0.28);
+        const g = actx.createGain();
+        g.gain.setValueAtTime(0.0001, whenSec);
+        g.gain.exponentialRampToValueAtTime(0.04, whenSec+0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, whenSec+0.32);
+        const filter = actx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 900;
+        o.connect(filter).connect(g).connect(dest);
+        o.start(whenSec); o.stop(whenSec+0.35);
+    } else if (style === 'click') {
+        const o = actx.createOscillator();
+        o.type = 'square';
+        o.frequency.setValueAtTime(880, whenSec);
+        const g = actx.createGain();
+        g.gain.setValueAtTime(0.0001, whenSec);
+        g.gain.exponentialRampToValueAtTime(0.08, whenSec+0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, whenSec+0.08);
+        o.connect(g).connect(dest);
+        o.start(whenSec); o.stop(whenSec+0.1);
+    } else if (style === 'rise') {
+        const o = actx.createOscillator();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(220, whenSec);
+        o.frequency.exponentialRampToValueAtTime(660, whenSec+0.22);
+        const g = actx.createGain();
+        g.gain.setValueAtTime(0.0001, whenSec);
+        g.gain.exponentialRampToValueAtTime(0.05, whenSec+0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, whenSec+0.28);
+        o.connect(g).connect(dest);
+        o.start(whenSec); o.stop(whenSec+0.3);
+    }
+}
+
+/* =========================================================
+   OFFLINE AUDIO RENDER FOR EXPORT
+   ========================================================= */
+async function renderAudioForExport(){
+    const duration = timelineTotal / 1000;
+    if (duration <= 0) return null;
+    const sampleRate = 48000;
+    const offlineCtx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate);
+    const master = offlineCtx.createGain();
+    master.gain.value = 0.9;
+    master.connect(offlineCtx.destination);
+
+    if (q$('bgMusicMode').value === 'upload' && bgMusicBuffer) {
+        const src = offlineCtx.createBufferSource();
+        src.buffer = bgMusicBuffer;
+        src.loop = true;
+        const g = offlineCtx.createGain();
+        g.gain.value = 0.35;
+        src.connect(g).connect(master);
+        src.start(0);
+        src.stop(duration);
+    }
+
+    if (customSfxBuffer) {
+        timeline.forEach(seg => {
+            const src = offlineCtx.createBufferSource();
+            src.buffer = customSfxBuffer;
+            const g = offlineCtx.createGain();
+            g.gain.value = 0.5;
+            src.connect(g).connect(master);
+            src.start(seg.start / 1000);
+        });
+    } else {
+        const style = q$('audioToggle').value;
+        if (style !== 'off') {
+            timeline.forEach((seg, i) => {
+                scheduleSfxOnCtx(offlineCtx, master, seg.start / 1000, style, i);
+            });
+        }
+    }
+
+    return await offlineCtx.startRendering();
+}
+
+function encodeAudioBuffer(audioBuffer, muxer){
+    return new Promise(async (resolve, reject) => {
+        if (!('AudioEncoder' in window)) return reject(new Error('AudioEncoder unavailable'));
+        try {
+            const sup = await AudioEncoder.isConfigSupported({
+                codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 2, bitrate: 128000
+            });
+            if (!sup.supported) throw new Error('AAC not supported');
+        } catch (e) { return reject(e); }
+
+        const encoder = new AudioEncoder({
+            output: (chunk, meta) => { try { muxer.addAudioChunk(chunk, meta); } catch (e) { reject(e); } },
+            error: reject
+        });
+        encoder.configure({ codec: 'mp4a.40.2', sampleRate: 48000, numberOfChannels: 2, bitrate: 128000 });
+
+        const sampleRate = audioBuffer.sampleRate;
+        const numCh = audioBuffer.numberOfChannels;
+        const totalFrames = audioBuffer.length;
+        const CHUNK = 4800;
+        try {
+            for (let i = 0; i < totalFrames; i += CHUNK) {
+                const frames = Math.min(CHUNK, totalFrames - i);
+                const data = new Float32Array(frames * numCh);
+                for (let c = 0; c < numCh; c++) {
+                    const ch = audioBuffer.getChannelData(c);
+                    for (let j = 0; j < frames; j++) data[c * frames + j] = ch[i + j];
+                }
+                const audioData = new AudioData({
+                    format: 'f32-planar',
+                    sampleRate, numberOfFrames: frames, numberOfChannels: numCh,
+                    timestamp: Math.round((i / sampleRate) * 1e6),
+                    data
+                });
+                encoder.encode(audioData);
+                audioData.close();
+                while (encoder.encodeQueueSize > 8) await sleep(4);
+            }
+            await encoder.flush();
+            encoder.close();
+            resolve(true);
+        } catch (e) { reject(e); }
+    });
+}
+
+/* =========================================================
+   WEBCodecs VIDEO EXPORT
+   ========================================================= */
+let expC = null;
+function prepExportCanvas(){
+    const res = +q$('xRes').value;
+    if (res === 720) {
+        expC = document.createElement('canvas');
+        expC.width = 1280; expC.height = 720;
+    } else {
+        expC = null;
+    }
+    return expC || canvas;
+}
+
+async function exportWithWebCodecs(){
+    const fps = +q$('xFps').value || 30;
+    const bitrateMbps = +q$('xMbps').value || 12;
+    const bitrate = bitrateMbps * 1_000_000;
+    const drawSource = prepExportCanvas();
+    const width = drawSource.width;
+    const height = drawSource.height;
+
+    const frameCount = Math.max(1, Math.round((timelineTotal / 1000) * fps));
+    const frameDurationUs = Math.round(1e6 / fps);
+
+    const wantsAudio = ('AudioEncoder' in window) && (
+        (q$('bgMusicMode').value === 'upload' && bgMusicBuffer) ||
+        customSfxBuffer ||
+        (q$('audioToggle').value !== 'off')
+    );
+
+    setStatus('🎧 Rendering audio track…');
+    let audioBuffer = null;
+    if (wantsAudio) {
+        try { audioBuffer = await renderAudioForExport(); }
+        catch (e) { console.warn('Audio render failed:', e); audioBuffer = null; }
+    }
+
+    const muxer = new Mp4Muxer.Muxer({
+        target: new Mp4Muxer.ArrayBufferTarget(),
+        video: { codec: 'avc', width, height },
+        audio: audioBuffer ? { codec: 'aac', sampleRate: 48000, numberOfChannels: 2 } : undefined,
+        fastStart: 'in-memory'
+    });
+
+    let audioPromise = Promise.resolve();
+    if (audioBuffer) {
+        audioPromise = encodeAudioBuffer(audioBuffer, muxer).catch(e => console.warn('Audio encode failed:', e));
+    }
+
+    let encoderError = null;
+    const videoEncoder = new VideoEncoder({
+        output: (chunk, meta) => { try { muxer.addVideoChunk(chunk, meta); } catch (e) { encoderError = e; } },
+        error: (e) => { encoderError = e; }
+    });
+
+    const codecCandidates = ['avc1.42001f', 'avc1.4d001f', 'avc1.640028'];
+    let configured = false;
+    for (const codec of codecCandidates) {
+        try {
+            const sup = await VideoEncoder.isConfigSupported({ codec, width, height, bitrate, framerate: fps });
+            if (sup.supported) {
+                videoEncoder.configure({ codec, width, height, bitrate, framerate: fps, latencyMode: 'quality' });
+                configured = true;
+                break;
+            }
+        } catch (_) {}
+    }
+    if (!configured) throw new Error('No supported H.264 encoder configuration.');
+
+    for (let i = 0; i < frameCount; i++) {
+        if (encoderError) throw encoderError;
+        if (isFinished) break;
+
+        const tMs = Math.min(timelineTotal, (i / fps) * 1000);
+        render(tMs, false, true);
+        if (expC) expC.getContext('2d').drawImage(canvas, 0, 0, 1280, 720);
+
+        const tsUs = Math.round((i / fps) * 1e6);
+        const frame = new VideoFrame(drawSource, { timestamp: tsUs, duration: frameDurationUs });
+        videoEncoder.encode(frame, { keyFrame: i % fps === 0 });
+        frame.close();
+
+        while (videoEncoder.encodeQueueSize > 12) {
+            await sleep(4);
+            if (encoderError) throw encoderError;
+        }
+        if (i % 10 === 0) {
+            const pct = Math.round(((i + 1) / frameCount) * 100);
+            setStatus(`🎞️ Encoding ${i + 1}/${frameCount} (${pct}%) · queue ${videoEncoder.encodeQueueSize}${audioBuffer ? ' · 🎵' : ''}`);
+            await sleep(0);
+        }
+    }
+
+    setStatus('⏳ Flushing encoders…');
+    await Promise.all([videoEncoder.flush(), audioPromise]);
+    if (encoderError) throw encoderError;
+
+    muxer.finalize();
+    const { buffer } = muxer.target;
+
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    const blob = new Blob([buffer], { type: 'video/mp4' });
+    blobUrl = URL.createObjectURL(blob);
+    fileName = `phone_comparison_${phoneA.name}_vs_${phoneB.name}_${fps}fps_${bitrateMbps}Mbps.mp4`
+                .replace(/[^\w\-.]+/g, '_');
+
+    setStatus(`✅ MP4 ready (${fps}fps · ${bitrateMbps} Mbps${audioBuffer ? ' · 🎵' : ''})`);
+    endModal.style.display = 'flex';
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = blobUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+/* =========================================================
+   LEGACY MEDIARECORDER PATH (fallback)
+   ========================================================= */
+function mkStream(){
+    prepExportCanvas();
+    return (expC || canvas).captureStream(+q$('xFps').value);
+}
+function cpExp(){ if(expC) expC.getContext('2d').drawImage(canvas, 0, 0, 1280, 720); }
+let wl = null;
+
+async function startMediaRecorderPath(){
+    const stream = mkStream();
+    if (liveAudioDest && liveAudioDest.stream.getAudioTracks().length) {
+        stream.addTrack(liveAudioDest.stream.getAudioTracks()[0]);
+    }
+    const candidates = [
+        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+        'video/mp4;codecs=avc1.42E01E',
+        'video/mp4',
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+    ];
+    let mime = '';
+    for (const m of candidates) if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) { mime = m; break; }
+
+    try {
+        mediaRecorder = new MediaRecorder(stream, {
+            mimeType: mime || 'video/webm',
+            videoBitsPerSecond: (+q$('xMbps').value || 12) * 1e6
+        });
+    } catch (err) {
+        alert('MediaRecorder not supported in this browser.');
+        isRunning = false;
+        return;
+    }
+
+    chunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mediaRecorder.mimeType });
+        stream.getTracks().forEach(t => t.stop());
+        if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+        blobUrl = URL.createObjectURL(blob);
+        const ext = mediaRecorder.mimeType.includes('mp4') ? 'mp4' : 'webm';
+        fileName = `phone_comparison_${phoneA.name}_vs_${phoneB.name}.${ext}`.replace(/[^\w\-.]+/g, '_');
+        endModal.style.display = 'flex';
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+    mediaRecorder.onerror = () => { alert('Recording error — saving what was captured.'); finishNow(); };
+
+    try { navigator.wakeLock.request('screen').then(w => { wl = w; }); } catch (_) {}
+    mediaRecorder.start(400);
+    await sleep(300);
+
+    startTimeMs = performance.now();
+    function loop(now){
+        if(isFinished) return;
+        const elapsed = now - startTimeMs;
+        render(elapsed, false); cpExp();
+        if(elapsed < timelineTotal){
+            rafId = requestAnimationFrame(loop);
+        } else {
+            render(timelineTotal, false); cpExp();
+            setTimeout(finishNow, 250);
+        }
+    }
+    rafId = requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   CONTROLS
+   ========================================================= */
+const topControls = q$('topControls');
+const endModal = q$('endModal');
+
+function finishNow(){
+    try { if (wl) wl.release(); } catch (_) {}
+    if (isFinished) return;
+    isFinished = true;
+    isRunning = false;
+    topControls.style.display = 'none';
+    if (rafId) cancelAnimationFrame(rafId);
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        try { mediaRecorder.requestData && mediaRecorder.requestData(); } catch (_) {}
+        setTimeout(() => { try { mediaRecorder.stop(); } catch (_) {} }, 300);
+    } else if (!('VideoEncoder' in window)) {
+        endModal.style.display = 'flex';
+    }
+}
+q$('stopBtn').addEventListener('click', () => {
+    finishNow();
+    stopLiveAudio();
+});
+
+q$('saveBtn').addEventListener('click', () => {
+    if (!blobUrl) return;
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = blobUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+});
+
+q$('newBtn').addEventListener('click', () => {
+    endModal.style.display = 'none';
+    q$('ui').style.display = 'flex';
+    refreshPreview();
+});
+
+q$('startBtn').addEventListener('click', startRender);
+
+async function startRender(){
+    stopPreviewPlay();
+    stopLiveAudio();
+
+    phoneA.name = q$('nameA').value.trim() || 'Phone A';
+    phoneB.name = q$('nameB').value.trim() || 'Phone B';
+    buildBackground();
+    const list = buildTimeline();
+    if (!list.length) { alert('No specs selected to render.'); return; }
+
+    curSegIdx = -1;
+    lastSegObj = null;
+    chimeCounter = 0;
+    isFinished = false;
+    isRunning = true;
+    render(0, false, true);
+
+    const exportMode = q$('exportMode').value;
+
+    if (exportMode === 'webcodecs') {
+        if (!hasWebCodecs) { alert('WebCodecs not available. Falling back to MediaRecorder.'); }
+        else {
+            try {
+                q$('ui').style.display = 'none';
+                topControls.style.display = 'flex';
+                await exportWithWebCodecs();
+            } catch (e) {
+                console.error(e);
+                setStatus('❌ Export failed: ' + (e.message || e));
+                alert('Export failed: ' + (e.message || e));
+            } finally {
+                isRunning = false;
+                isFinished = true;
+                topControls.style.display = 'none';
+            }
+            return;
+        }
+    }
+
+    if (exportMode === 'download') {
+        q$('ui').style.display = 'none';
+        endModal.style.display = 'none';
+        topControls.style.display = 'flex';
+        if (q$('audioToggle').value !== 'off' || bgMusicBuffer) initLiveAudio();
+        if (document.documentElement.requestFullscreen) {
+            try { await document.documentElement.requestFullscreen(); } catch (_) {}
+        }
+        await sleep(500);
+        await startMediaRecorderPath();
+        return;
+    }
+
+    // Preview-only path
+    q$('ui').style.display = 'none';
+    topControls.style.display = 'flex';
+    if (q$('audioToggle').value !== 'off' || bgMusicBuffer) initLiveAudio();
+    if (document.documentElement.requestFullscreen) {
+        try { await document.documentElement.requestFullscreen(); } catch (_) {}
+    }
+    await sleep(500);
+    startTimeMs = performance.now();
+    function loop(now){
+        if (isFinished) return;
+        const elapsed = now - startTimeMs;
+        render(elapsed, false, false);
+        if (elapsed < timelineTotal) {
+            rafId = requestAnimationFrame(loop);
+        } else {
+            render(timelineTotal, false, false);
+            setTimeout(finishNow, 250);
+        }
+    }
+    rafId = requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   COLUMN MAPPER (kept from v3)
+   ========================================================= */
+let raw = null, batchStop = false;
+q$('dataFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    Papa.parse(f, { skipEmptyLines: 'greedy', complete: res => {
+        const rows = (res.data || []).filter(r => Array.isArray(r) && r.some(c => String(c ?? '').trim() !== ''));
+        if (rows.length < 2) { alert('File needs a header row + at least one spec row.'); return; }
+        let head = rows[0], data = rows.slice(1);
+        if (!/spec|feature|attribute|parameter|detail|category/i.test(String(head[0] || ''))) {
+            head = ['Specification', 'Phone A', 'Phone B'];
+            data = rows;
+        }
+        let win = head.findIndex((h, i) => i > 0 && /winner|better|best|^win/i.test(String(h)));
+        if (win < 0 && head.length === 4) win = 3;
+        raw = { head, rows: data, file: f.name, win };
+        buildMap(); applyCols();
+    }});
+});
+
+function buildMap(){
+    const H = raw.head;
+    const op = s => H.map((h, i) => `<option value="${i}"${i === s ? ' selected' : ''}>${escapeHtml(String(h || 'Column ' + (i+1)))}</option>`).join('');
+    const ph_ = H.map((h, i) => i === 0 || i === raw.win ? '' : `<label class="chk" style="margin:2px"><input type="checkbox" value="${i}" checked> ${escapeHtml(String(h || 'Column ' + (i+1)))}</label>`).join('');
+    q$('colMap').style.display = 'block';
+    q$('colMap').innerHTML = `<div class="row"><div><label>Spec column</label><select id="cSpec">${op(0)}</select></div><div><label>Phone A column</label><select id="cA">${op(1)}</select></div><div><label>Phone B column</label><select id="cB">${op(Math.min(2, H.length-1))}</select></div></div>` +
+        `<div class="row"><div style="flex:2"><label>Winner column (optional)</label><select id="cWin"><option value="-1">— none —</option>${op(raw.win)}</select></div><div><button type="button" class="btn-secondary" id="swapAB">⇄ Swap A / B</button></div></div>` +
+        `<div class="hint"><b>Batch videos</b> — tick phone columns, choose pairing, render every video without re-uploading:</div><div class="row" id="bPh" style="flex-wrap:wrap">${ph_}</div>` +
+        `<div class="row"><div><select id="bMode"><option value="consec">Pairs in order (1v2, 3v4…)</option><option value="first">First ticked vs each other</option><option value="all">Every combination</option></select></div><div><button type="button" id="bRun">▶ Render batch</button></div></div><div class="hint" id="bInfo"></div>`;
+    bInfo();
+}
+function applyCols(){
+    if (!raw) return;
+    const cs = +q$('cSpec').value, ca = +q$('cA').value, cb = +q$('cB').value, cw = +q$('cWin').value;
+    const first = ca < cb ? 'a' : 'b';
+    const str = v => String(v ?? '').trim();
+    const nm = i => String(raw.head[i] ?? '').trim().toLowerCase();
+    const mw = v => {
+        v = str(v).toLowerCase();
+        if (!v || cw < 0) return null;
+        if (v === nm(ca)) return 'a';
+        if (v === nm(cb)) return 'b';
+        if (v === '1') return first;
+        if (v === '2') return first === 'a' ? 'b' : 'a';
+        const m = mapWinnerFromCsv(v);
+        return m === 'auto' ? null : m;
+    };
+    specs = [];
+    raw.rows.forEach(r => {
+        const name = str(r[cs]);
+        if (name) specs.push({ name, a: str(r[ca]) || '—', b: str(r[cb]) || '—', include: true, winnerMode: 'auto', csvWin: mw(r[cw]) });
+    });
+    if (!specs.length) { alert('No spec rows detected with this column choice.'); return; }
+    q$('nameA').value = phoneA.name = str(raw.head[ca]) || 'Phone A';
+    q$('nameB').value = phoneB.name = str(raw.head[cb]) || 'Phone B';
+    renderSpecList(); updateDataInfo(raw.file); updateEstimate(); refreshPreview();
+}
+function pairs(){
+    const c = [...document.querySelectorAll('#bPh input:checked')].map(i => +i.value);
+    const m = q$('bMode').value, P = [];
+    if (m === 'first') for (let i = 1; i < c.length; i++) P.push([c[0], c[i]]);
+    else if (m === 'all') for (let i = 0; i < c.length; i++) for (let j = i+1; j < c.length; j++) P.push([c[i], c[j]]);
+    else for (let i = 0; i+1 < c.length; i += 2) P.push([c[i], c[i+1]]);
+    return P;
+}
+function bInfo(){
+    const n = pairs().length;
+    q$('bInfo').textContent = `${n} video${n === 1 ? '' : 's'} queued. Pressing Cancel ends the whole batch.`;
+}
+async function runBatch(){
+    const P = pairs();
+    if (!P.length) { alert('Tick at least two phone columns.'); return; }
+    q$('exportMode').value = hasWebCodecs ? 'webcodecs' : 'download';
+    batchStop = false;
+    for (let i = 0; i < P.length && !batchStop; i++) {
+        q$('cA').value = P[i][0];
+        q$('cB').value = P[i][1];
+        applyCols();
+        const before = blobUrl;
+        await startRender();
+        if (!isRunning && !isFinished) break;
+        await new Promise(res => {
+            const iv = setInterval(() => {
+                if ((blobUrl && blobUrl !== before && !isRunning) || batchStop) {
+                    clearInterval(iv); res();
+                }
+            }, 600);
+        });
+        await sleep(1500);
+        endModal.style.display = 'none';
+    }
+    endModal.style.display = 'flex';
+}
+q$('colMap').addEventListener('change', e => {
+    const id = e.target.id;
+    if (['cSpec','cA','cB','cWin'].includes(id)) applyCols();
+    else if (id === 'bMode' || e.target.closest('#bPh')) bInfo();
+});
+q$('colMap').addEventListener('click', e => {
+    if (e.target.id === 'swapAB') { const a = q$('cA'), b = q$('cB'), t = a.value; a.value = b.value; b.value = t; applyCols(); }
+    else if (e.target.id === 'bRun') runBatch();
+});
+q$('stopBtn').addEventListener('click', () => { batchStop = true; });
+q$('autoWin').addEventListener('input', refreshPreview);
+
+/* =========================================================
+   EXTRA ANIMATIONS (NEWA)
+   ========================================================= */
+const NEWA = ['fade','fadeRise','slideLeft','slideRight','slideUp','slideDown','zoomIn','zoomOut','wipe','iris','subtle'];
+const hashStr = t => [...t].reduce((h, c) => (h*31 + c.charCodeAt(0)) >>> 0, 7);
+function extraAnim(style, p, side){
+    if (style === 'random') style = NEWA[hashStr(lastSegObj ? lastSegObj.spec.name : '') % NEWA.length];
+    if (!NEWA.includes(style)) return null;
+    const so = (+q$('snapSpeed').value || 14) / 100;
+    const ei = smootherstep(clamp(p/.2, 0, 1));
+    const eo = smootherstep(clamp((p - (1-so))/so, 0, 1));
+    const k = 1 - ei, d = side === 'left' ? -1 : 1;
+    const o = { dx:0, dy:0, scaleX:1, scaleY:1, alpha: ei*(1-eo) };
+    if (style === 'fadeRise') o.dy = k*60;
+    else if (style === 'slideLeft') o.dx = -k*260;
+    else if (style === 'slideRight') o.dx = k*260;
+    else if (style === 'slideUp') o.dy = k*200;
+    else if (style === 'slideDown') o.dy = -k*200;
+    else if (style === 'zoomIn') o.scaleX = o.scaleY = .5 + .5*ei;
+    else if (style === 'zoomOut') o.scaleX = o.scaleY = 1.5 - .5*ei;
+    else if (style === 'subtle') o.scaleX = o.scaleY = .94 + .06*ei;
+    else { o.alpha = 1 - eo; o.clip = { t: style === 'iris' ? 'i' : 'w', v: ei, d }; }
+    return o;
+}
+
+/* =========================================================
+   BACKGROUND EXTENSIONS (bgFill, bgPattern)
+   ========================================================= */
+const BGL = {
+    neon:['Neon Sunset','#ff2d95','#2b0a3d','linear'],
+    cyber:['Cyber Teal','#00e5ff','#1b0b4d','diag'],
+    crimson:['Crimson Arena','#ff3b30','#1a0505','radial'],
+    aurora:['Aurora','#00ffa3','#0b1d4d','linear'],
+    space:['Deep Space','#1b2a6b','#000000','radial'],
+    gold:['Gold Luxe','#f5c542','#2a1a00','diag'],
+    ice:['Ice Blue','#d6f1ff','#2f6fa8','linear'],
+    mono:['Mono Steel','#4a4f57','#0a0b0d','radial']
+};
+const BGT = {};
+Object.keys(BGL).forEach(k => { BG_PRESETS[k] = { inner: BGL[k][1], outer: BGL[k][2] }; BGT[k] = BGL[k][3]; });
+function bgFill(g, c1, c2, key){
+    let ty = q$('bgType') ? q$('bgType').value : 'auto';
+    if (ty === 'auto') ty = BGT[key] || 'radial';
+    let gr;
+    if (ty === 'radial') gr = g.createRadialGradient(960, 470, 60, 960, 540, 1320);
+    else {
+        const a = ((ty === 'diag' ? 35 : +q$('bgAngle').value) || 0) * Math.PI / 180;
+        const dx = Math.cos(a) * W/2, dy = Math.sin(a) * H/2;
+        gr = g.createLinearGradient(960 - dx, 540 - dy, 960 + dx, 540 + dy);
+    }
+    gr.addColorStop(0, c1); gr.addColorStop(1, c2);
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+}
+function bgPattern(g){
+    const k = q$('bgPat') ? q$('bgPat').value : 'none';
+    if (k === 'none') return;
+    g.save();
+    g.strokeStyle = g.fillStyle = `rgba(255,255,255,${(q$('bgPatA') ? q$('bgPatA').value : 12)/100})`;
+    g.lineWidth = 2;
+    if (k === 'notebook') {
+        for (let y = 90; y < H; y += 60) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+        g.strokeStyle = 'rgba(255,80,80,.4)';
+        g.beginPath(); g.moveTo(150, 0); g.lineTo(150, H); g.stroke();
+    } else if (k === 'waves') {
+        for (let y = 40; y < H+40; y += 70) {
+            g.beginPath();
+            for (let x = 0; x <= W; x += 20) g.lineTo(x, y + Math.sin(x/90 + y)*18);
+            g.stroke();
+        }
+    } else if (k === 'diag') {
+        for (let x = -H; x < W; x += 48) { g.beginPath(); g.moveTo(x, H); g.lineTo(x+H, 0); g.stroke(); }
+    } else if (k === 'dots') {
+        for (let y = 30; y < H; y += 44) for (let x = 30; x < W; x += 44) {
+            g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
+        }
+    } else if (k === 'grid') {
+        for (let x = 0; x < W; x += 60) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+        for (let y = 0; y < H; y += 60) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    }
+    g.restore();
+}
+
+/* =========================================================
+   INJECT EXTRA UI CONTROLS (bg type/angle/pattern, spec photos, motion, VS, tally, element studio, project)
+   ========================================================= */
+(function(){
+    // Background extras
+    const B = document.querySelector('[data-section="5"] .accordion-inner');
+    if (B) {
+        B.insertAdjacentHTML('beforeend',
+            '<div class="row"><div><label>Gradient type</label><select id="bgType"><option value="auto">Preset default</option><option value="radial">Radial glow</option><option value="linear">Linear (use angle)</option><option value="diag">Diagonal</option></select></div><div><label>Gradient angle</label><input type="range" id="bgAngle" min="0" max="360" value="90"></div></div>' +
+            '<div class="row"><div><label>Pattern overlay</label><select id="bgPat"><option value="none">None</option><option value="notebook">Notebook ruled</option><option value="waves">Waves</option><option value="diag">Diagonal stripes</option><option value="dots">Dots</option><option value="grid">Grid</option></select></div><div><label>Pattern strength</label><input type="range" id="bgPatA" min="2" max="40" value="12"></div></div>'
+        );
+        q$('bgPreset').addEventListener('input', () => {
+            const p = BG_PRESETS[q$('bgPreset').value];
+            if (p) { q$('bgInner').value = p.inner; q$('bgOuter').value = p.outer; }
+        });
+        ['bgType','bgAngle','bgPat','bgPatA'].forEach(id => {
+            const el2 = q$(id);
+            if (el2) el2.addEventListener('input', () => { buildBackground(); refreshPreview(); });
+        });
+    }
+
+    // Spec photos & winner effects
+    const P = acc('P', 'Spec photos &amp; winner effects');
+    P.insertAdjacentHTML('beforeend',
+        '<div class="row"><div><label>Spec photo placement</label><select id="imgMode"><option value="replace">Replace phones for that spec</option><option value="center">Pop up in the centre</option><option value="card">Above the spec value card</option><option value="static">Static: one image, whole video</option></select></div></div>' +
+        '<div class="hint">Tap 📷 on a row in Data → Specs To Show to add a photo. A CSV column named "Image", "Photo" or "Spec Image URL" loads automatically.</div>' +
+        '<div class="row"><div><label>Winner icon over image</label><select id="wbIcon"><option value="🏆">🏆 Trophy</option><option value="👑">👑 Crown</option><option value="✅">✅ Check</option><option value="⭐">⭐ Star</option><option value="🔥">🔥 Fire</option><option value="💎">💎 Diamond</option><option value="none">None</option></select></div><div><label>Icon animation</label><select id="wbAnim"><option value="pop">Pop in</option><option value="bounce">Bounce</option><option value="spin">Spin</option><option value="pulse">Pulse</option><option value="none">Static</option></select></div></div>' +
+        '<div class="row"><div><label>Winner glow colour</label><input type="color" id="wgColor" value="#43e97b"></div><div><label>Winner glow strength</label><input type="range" id="wgSize" min="0" max="80" value="30"></div></div>'
+    );
+
+    // Phone motion
+    const M = acc('A', 'Phone motion');
+    M.insertAdjacentHTML('beforeend',
+        '<label>Phone animation</label><select id="phMotion"><option value="hover">Subtle hover float</option><option value="pendulum">3D pendulum tilt</option><option value="winpop">Winner zoom pop</option><option value="orbit">Figure-8 orbit drift</option><option value="bounce">Energetic bounce</option><option value="slidein">Slide-in entrance</option><option value="static">Static (locked)</option></select>'
+    );
+
+    // VS badge & tally
+    const V = acc('V', 'VS badge &amp; winner tally');
+    V.insertAdjacentHTML('beforeend',
+        '<div class="row"><div><label>VS shape</label><select id="vsShape"><option value="box">Bar box (original)</option><option value="circle">Circle</option><option value="hex">Hexagon</option><option value="shield">Esports shield</option><option value="diamond">Diamond</option><option value="text">Glowing text only</option></select></div><div><label>VS pulse</label><select id="vsPulse"><option value="static">Static</option><option value="heart">Heartbeat</option><option value="spin">Spin-in</option><option value="jitter">Electric jitter</option></select></div></div>' +
+        '<div class="row"><div><label>Gradient / glow colour</label><input type="color" id="vsFill2" value="#7c4dff"></div><div><label>Border colour</label><input type="color" id="vsBorderC" value="#ffffff"></div></div>' +
+        '<label>Custom VS image (PNG/WebP)</label><input type="file" id="vsFile" accept="image/*"><button type="button" class="btn-secondary" id="vsClr">✖ Remove VS image</button>' +
+        '<div class="hint"><b>Winner tally</b> — running count of spec wins.</div><div class="row"><div><label class="chk"><input type="checkbox" id="tallyOn" checked> Show winner tally</label></div><div><label>Style</label><select id="tallyStyle"><option value="score">Score  3 : 2</option><option value="bars">Progress bars</option><option value="trophies">Trophies</option><option value="dots">Dots per spec</option></select></div></div>' +
+        '<div class="row"><div><label>Phone A colour</label><input type="color" id="tallyCA" value="#00e5ff"></div><div><label>Phone B colour</label><input type="color" id="tallyCB" value="#ff4fd8"></div></div>'
+    );
+    q$('vsFile').onchange = e => {
+        const f = e.target.files[0]; if (!f) return;
+        const fr = new FileReader();
+        fr.onload = () => { const im = new Image(); im.onload = () => { vsImg = im; refreshPreview(); }; im.src = fr.result; };
+        fr.readAsDataURL(f);
+    };
+    q$('vsClr').onclick = () => { vsImg = null; q$('vsFile').value = ''; refreshPreview(); };
+
+    // Element Studio
+    const E = acc('9', 'Element Studio — position · size · opacity');
+    EK.forEach(k => {
+        E.insertAdjacentHTML('beforeend', `<div class="hint"><b>${k[1]}</b></div>`);
+        const o = el[k[0]];
+        const r = row(E);
+        const cb = document.createElement('div');
+        cb.innerHTML = '<label class="chk"><input type="checkbox" checked> Show</label>';
+        const inp = cb.querySelector('input');
+        inp.onchange = () => { o.show = inp.checked; refreshPreview(); };
+        r.appendChild(cb);
+        sl(r, 'Opacity', o, 'op', 0, 100, 1, '%');
+        const r2 = row(E);
+        sl(r2, 'Move X', o, 'dx', -700, 700, 1, 'px');
+        sl(r2, 'Move Y', o, 'dy', -450, 450, 1, 'px');
+        sl(E, 'Size', o, 'sc', 40, 250, 1, '%');
+    });
+
+    // Phone PNGs
+    const PN = acc('8', 'Phone PNGs');
+    ['a','b'].forEach(k => {
+        PN.insertAdjacentHTML('beforeend', `<div class="hint"><b>Phone ${k.toUpperCase()} image</b></div>`);
+        const f = document.createElement('input');
+        f.type = 'file'; f.accept = 'image/*';
+        f.onchange = () => {
+            const fr = new FileReader();
+            fr.onload = () => { setPhImg(k, fr.result); ph.sel = k; };
+            if (f.files[0]) fr.readAsDataURL(f.files[0]);
+        };
+        PN.appendChild(f);
+        const o = ph[k];
+        let r = row(PN);
+        const c1 = document.createElement('div');
+        c1.innerHTML = '<label class="chk"><input type="checkbox" checked> Visible</label>';
+        const chk1 = c1.querySelector('input');
+        chk1.onchange = () => { o.show = chk1.checked; refreshPreview(); };
+        r.appendChild(c1);
+        sl(r, 'Opacity', o, 'op', 0, 100, 1, '%');
+        r = row(PN); sl(r, 'X', o, 'x', 0, 1920, 1, 'px'); sl(r, 'Y', o, 'y', 0, 1080, 1, 'px');
+        r = row(PN); sl(r, 'Size', o, 's', 20, 240, 1, '%'); sl(r, 'Rotation', o, 'rot', -45, 45, 1, '°');
+        r = row(PN); sl(r, 'Glow', o, 'glow', 0, 60, 1, ''); sl(r, 'Shadow', o, 'sh', 0, 60, 1, '');
+    });
+    let r = row(PN);
+    const cf = document.createElement('div');
+    cf.innerHTML = '<label class="chk"><input type="checkbox" checked> Gentle float</label>';
+    cf.querySelector('input').onchange = e => { ph.float = e.target.checked; refreshPreview(); };
+    r.appendChild(cf);
+    sl(PN, 'Phone base height', ph, 'base', 300, 900, 10, 'px');
+
+    // Spec photos: drawFit integration
+    function specImg(sp){ if(q$('imgMode').value==='static'){ const f = specs.find(z => z.img); return f && f.img; } return sp.img || null; }
+    function drawFit(im, cx, cy, mw, mh, win, t, sc){
+        sc = sc || 1;
+        const r = Math.min(mw/im.naturalWidth, mh/im.naturalHeight) * sc;
+        const w = im.naturalWidth*r, h = im.naturalHeight*r;
+        ctx.save();
+        if (win && ph.winGlow && q$('wgColor')) {
+            ctx.shadowColor = q$('wgColor').value;
+            ctx.shadowBlur = +q$('wgSize').value * 2;
+        } else {
+            ctx.shadowColor = 'rgba(0,0,0,.6)';
+            ctx.shadowBlur = 30; ctx.shadowOffsetY = 14;
+        }
+        ctx.drawImage(im, cx-w/2, cy-h/2, w, h);
+        ctx.restore();
+        if (win) winBadge(cx+w/2-20, cy-h/2+20, t);
+    }
+    const origDP = _drawPhones;
+    _drawPhones = function(spec, prev, t){
+        if (!q$('imgMode')) return origDP.call(this, spec, prev, t);
+        const mode = q$('imgMode').value;
+        const im = specImg(spec);
+        const ok = im && im.naturalWidth;
+        const w = q$('highlight').checked ? computeWinner(spec) : null;
+        const sg = lastSegObj, p = sg ? clamp((t-sg.start)/sg.dur, 0, 1) : 1;
+        if (ok && (mode === 'replace' || mode === 'static')) {
+            drawFit(im, 960, 500, 700, 700, w, t);
+            return;
+        }
+        origDP.call(this, spec, prev, t);
+        if (w && ph[w].img && ph[w].show) {
+            const b = phBox(ph[w]);
+            winBadge(ph[w].x + b.w/2 - 10, ph[w].y - b.h/2 + 10, t);
+        }
+        if (ok && mode === 'center') drawFit(im, 960, 480, 560, 560, w, t, easeOutBack(p/.2));
+        else if (ok && mode === 'card') {
+            const ex = +q$('specX').value;
+            drawFit(im, w === 'b' ? W-ex : ex, +q$('specY').value - 250, 300, 230, w, t);
+        }
+    };
+
+    // Tally wrapper
+    const origDC = drawChrome;
+    drawChrome = function(t){
+        origDC(t);
+        if (!q$('tallyOn') || !q$('tallyOn').checked) return;
+        let a = 0, b = 0;
+        const cur = timeline.indexOf(lastSegObj);
+        timeline.forEach((sg, i) => {
+            if (i > cur) return;
+            const w = computeWinner(sg.spec);
+            if (w === 'a') a++;
+            else if (w === 'b') b++;
+        });
+        WR('tally', 960, 165, () => {
+            const st = q$('tallyStyle').value, ca = q$('tallyCA').value, cb = q$('tallyCB').value;
+            const tot = Math.max(1, timeline.length);
+            ctx.save();
+            ctx.translate(960, 165);
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            const box = (w, h) => { ctx.fillStyle = 'rgba(0,0,0,.55)'; roundRect(ctx, -w/2, -h/2, w, h, h/2); ctx.fill(); };
+            if (st === 'score') {
+                box(420, 84);
+                ctx.font = '900 52px ' + TITLE_FONT;
+                ctx.fillStyle = ca; ctx.fillText(a, -120, 3);
+                ctx.fillStyle = '#fff'; ctx.fillText(':', 0, 0);
+                ctx.fillStyle = cb; ctx.fillText(b, 120, 3);
+            } else if (st === 'bars') {
+                box(700, 60);
+                ctx.fillStyle = 'rgba(255,255,255,.12)';
+                ctx.fillRect(-320, -9, 290, 18);
+                ctx.fillRect(30, -9, 290, 18);
+                ctx.fillStyle = ca; ctx.fillRect(-320, -9, 290*a/tot, 18);
+                ctx.fillStyle = cb; ctx.fillRect(30, -9, 290*b/tot, 18);
+                ctx.font = '900 30px ' + TITLE_FONT;
+                ctx.fillText(a, -345, 2); ctx.fillText(b, 345, 2);
+            } else if (st === 'trophies') {
+                box(720, 76);
+                ctx.font = '38px ' + BODY_FONT;
+                ctx.textAlign = 'right';
+                ctx.fillText('🏆'.repeat(Math.min(a, 10)) || '–', -36, 3);
+                ctx.textAlign = 'left';
+                ctx.fillText('🏆'.repeat(Math.min(b, 10)) || '–', 36, 3);
+            } else {
+                const n = cur + 1, w0 = n * 34;
+                box(w0 + 50, 56);
+                for (let i = 0; i < n; i++) {
+                    const w = computeWinner(timeline[i].spec);
+                    ctx.fillStyle = w === 'a' ? ca : w === 'b' ? cb : '#777';
+                    ctx.beginPath(); ctx.arc(-w0/2 + 17 + i*34, 0, 11, 0, 7); ctx.fill();
+                }
+            }
+            ctx.restore();
+        });
+    };
+
+    // Spec list photo button
+    q$('specList').addEventListener('click', e => {
+        const b = e.target.closest('.pimg');
+        if (!b) return;
+        const i = +b.dataset.i;
+        if (specs[i].img) {
+            if (confirm('Remove this spec photo?')) { specs[i].img = null; renderSpecList(); refreshPreview(); }
+            return;
+        }
+        const f = document.createElement('input');
+        f.type = 'file'; f.accept = 'image/*';
+        f.onchange = () => {
+            if (!f.files[0]) return;
+            const fr = new FileReader();
+            fr.onload = () => {
+                const im = new Image();
+                im.onload = () => { specs[i].img = im; renderSpecList(); refreshPreview(); };
+                im.src = fr.result;
+            };
+            fr.readAsDataURL(f.files[0]);
+        };
+        f.click();
+    });
+
+    // Project save/load hooks
+    q$('saveJson').onclick = saveJson;
+    q$('loadJson').onclick = () => q$('jsonFile').click();
+    q$('jsonFile').onchange = e => {
+        const f = e.target.files[0];
+        if (f) f.text().then(s => { try { loadJson(JSON.parse(s)); } catch (err) { alert('Not a valid settings file.'); } });
+        e.target.value = '';
+    };
+    q$('resetSettings').onclick = resetAll;
+})();
+
+/* =========================================================
+   HELPERS FOR EXTRA UI BUILDERS
+   ========================================================= */
+const SY = [];
+function syncAll(){ SY.forEach(f => f()); }
+function sl(h, lab, o, k, mn, mx, st, u){
+    const d = document.createElement('div');
+    d.innerHTML = '<label>' + lab + ' — <span class="val-label"></span></label><input type="range" min="' + mn + '" max="' + mx + '" step="' + (st||1) + '">';
+    const i = d.querySelector('input'), s = d.querySelector('span');
+    const f = () => { i.value = o[k]; s.textContent = o[k] + u; };
+    i.oninput = () => { o[k] = +i.value; s.textContent = i.value + u; refreshPreview(); };
+    f(); SY.push(f);
+    h.append(d);
+}
+function row(h){ const r = document.createElement('div'); r.className = 'row'; h.append(r); return r; }
+function acc(n, t){
+    const a = document.createElement('div');
+    a.className = 'accordion';
+    a.innerHTML = '<div class="accordion-header"><h4><span>' + n + '</span> ' + t + '</h4><svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></div><div class="accordion-body"><div class="accordion-inner"></div></div>';
+    a.firstChild.onclick = () => a.classList.toggle('open');
+    q$('startBtn').before(a);
+    return a.querySelector('.accordion-inner');
+}
+
+/* =========================================================
+   PROJECT JSON
+   ========================================================= */
+function saveJson(){
+    const s = { v: 3, x3: X3, ui: {}, ph: {}, el: el, phg: { float: ph.float, winGlow: ph.winGlow, base: ph.base } };
+    document.querySelectorAll('#ui input[id], #ui select[id]').forEach(i => {
+        if (i.type === 'file' || i.id === 'embedImg' || i.closest('#colMap')) return;
+        s.ui[i.id] = i.type === 'checkbox' ? i.checked : i.value;
+    });
+    ['a','b'].forEach(k => {
+        const p = Object.assign({}, ph[k]);
+        delete p.img;
+        if (!q$('embedImg') || !q$('embedImg').checked) delete p.src;
+        s.ph[k] = p;
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(s)], { type: 'application/json' }));
+    a.download = 'phone-compare-settings.json';
+    a.click();
+}
+function loadJson(s){
+    for (const id in s.ui) {
+        const i = q$(id); if (!i) continue;
+        if (i.type === 'checkbox') i.checked = s.ui[id]; else i.value = s.ui[id];
+        i.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    ['a','b'].forEach(k => {
+        const p = s.ph && s.ph[k];
+        if (!p) return;
+        const src = p.src;
+        delete p.src;
+        Object.assign(ph[k], p);
+        if (src) setPhImg(k, src);
+    });
+    if (s.x3) Object.assign(X3, s.x3);
+    if (s.phg) Object.assign(ph, s.phg);
+    for (const k in s.el || {}) if (el[k]) Object.assign(el[k], s.el[k]);
+    syncAll(); updateSliderLabels(); buildBackground(); updateEstimate(); refreshPreview();
+}
+
+/* =========================================================
+   TAB BAR
+   ========================================================= */
+(function(){
+    const TABS = [
+        ['📂 Data', ['1','3']],
+        ['📱 Phones', ['8','P','A']],
+        ['⚔️ VS & Overlays', ['V','9']],
+        ['✨ Anim & Layout', ['2']],
+        ['🎨 Style', ['4','5','6']],
+        ['🎬 Export', ['7','10']]
+    ];
+    const id = a => a.dataset.section || (a.querySelector('h4 span') || {}).textContent?.trim();
+    const bar = q$('tabs');
+    const all = [...document.querySelectorAll('#ui-scroll .accordion')];
+    const show = n => {
+        [...bar.children].forEach((b, i) => b.classList.toggle('on', i === n));
+        all.forEach(a => a.classList.toggle('show', TABS[n][1].includes(id(a))));
+        q$('ui-scroll').scrollTop = 0;
+    };
+    TABS.forEach((t, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = t[0];
+        b.onclick = () => show(i);
+        bar.append(b);
+    });
+    show(0);
+})();
+
+/* =========================================================
+   BOOT
+   ========================================================= */
+window.addEventListener('load', () => {
+    loadSettings();
+    updateAudioStatus();
+    q$('bgMusicUploadRow').style.display = q$('bgMusicMode').value === 'upload' ? 'flex' : 'none';
+    renderSpecList();
+    updateSliderLabels();
+    buildBackground();
+    updateEstimate();
+    refreshPreview();
+});
+</script>
+</body>
+</html>
